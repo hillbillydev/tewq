@@ -1,0 +1,47 @@
+title {label: "Tewq Entity Relationship Diagram", size: "20"}
+
+# Nice colors from Erwiz:
+# red #fcecec
+# blue #ececfc
+# green #d0e0d0
+# yellow #fbfbdb
+# orange #eee0a0
+
+[person] {bgcolor: "#d0e0d0"}
+  *person_id {label: "person_id, not null"}
+  first_name {label: "varchar, not null"}
+  last_name {label: "varchar, not null"}
+
+[order]
+  *order_id {label: "varchar, not null"}
+  status {label: "status, not null"}
+  delivered {label: "utcdate, not null"}
+
+[product]
+  *product_id {label: "varchar, not null"}
+  name { label: "varchar, not null"}
+  description {label: "varchar, not null"}
+
+[item]
+  *item_id {label: "varchar, not null"}
+  price {label: "decimal, not null"}
+
+[basket]
+  *basket_id {label: "varchar, not null"}
+
+# Each relationship must be between exactly two entities, which need not
+# be distinct. Each entity in the relationship has exactly one of four
+# possible cardinalities:
+#
+# Cardinality    Syntax
+# 0 or 1         0
+# exactly 1      1
+# 0 or more      *
+# 1 or more      +
+
+person 1--1 basket
+person 1--* order
+
+basket 1--* item
+
+product 1--* item
