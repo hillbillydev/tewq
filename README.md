@@ -1,5 +1,7 @@
 # Tewq
 
+Me trying to apply what I have learned from [this book](https://www.dynamodbbook.com/), and also to learn more about "Serverless".
+
 ## DynamoDB Access Patterns
 
 |  Access Patterns                                | By                     | Table/Index  | Key Condition                         | Filter Condition                                          |
