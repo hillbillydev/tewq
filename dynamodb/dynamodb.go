@@ -1,45 +1,75 @@
 package dynamodb
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/google/uuid"
 )
 
+type Option struct {
+	ID string `json:"id"`
+}
+
 type Product struct {
-	ID   uuid.UUID
-	Name string
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Price       int       `json:"price"`
+	Weight      int       `json:"weight"`
+	Image       string    `json:"image"`
+	Thumbnail   string    `json:"thumbNail"`
+	CreatedDate time.Time `json:"createdDate"`
+	Stock       int       `json:"stock"`
+    Options     []Option  `json:"options" dynamodbav:"-"`
+}
+
+type Basket struct {
+	ID string `json:"id"`
 }
 
 type DynamoDB struct {
-	db *dynamodb.DynamoDB
+	db        *dynamodb.DynamoDB
+	tableName string
+	endpoint  string
 }
 
-func New() (*DynamoDB, error) {
+func New(endpoint, tableName string) (*DynamoDB, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
+	svc := dynamodb.New(sess, &aws.Config{
+		Endpoint: aws.String(endpoint),
+	})
 
 	return &DynamoDB{
-		db: dynamodb.New(sess, &aws.Config{
-			Endpoint: aws.String("http://localhost:8000"),
-		}),
+		db:        svc,
+		tableName: tableName,
 	}, nil
 }
 
 func (db *DynamoDB) AddProduct(p Product) error {
-	_, err := db.db.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String("Tewq"),
-		Item: map[string]*dynamodb.AttributeValue{
-			"PK": {
-				S: aws.String("Test"),
-			},
-			"SK": {
-				S: aws.String("Test"),
-			},
-		},
+	p.ID = uuid.New().String()
+	pk := fmt.Sprintf("PRODUCT#%s", p.ID)
+	sort := "METADATA#"
+
+	item, err := dynamodbattribute.MarshalMap(&p)
+	if err != nil {
+		return err
+	}
+	item["type"] = &dynamodb.AttributeValue{S: aws.String("product")}
+	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
+	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
+
+	_, err = db.db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(db.tableName),
+		Item:      item,
 	})
 
 	return err
 }
+
