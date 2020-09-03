@@ -8,6 +8,9 @@ init:
 	$(info [*] Bootstrapping CI system...)
 
 build-erd: # TODO FIX only works with Docker installed and on Mac...
+test:
+	go test ./...
+
 	$(info [*] Bulilding Entity Relationship Diagram...)
 	cat erd.er | docker run --rm -i kaishuu0123/erd-go | docker run --rm -i risaacson/graphviz dot -T png > erd.png
 	open erd.png
@@ -24,6 +27,9 @@ Common usage:
 
 ...::: Bootstraps environment.
 $ make init
+
+...::: Tests the whole code base.
+$ make test
 
 ...::: Build Relationship Diagram
 $ make build-erd
