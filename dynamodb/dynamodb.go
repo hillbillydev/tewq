@@ -54,12 +54,12 @@ func New(endpoint, tableName string) (*DynamoDB, error) {
 
 // AddProduct take a Product p and attempts to put that item into DynamoDB.
 // If the caller provides an ID on the product we will fail straight away.
-func (db *DynamoDB) AddProduct(p Product) error {
+func (db *DynamoDB) AddProduct(p Product) (string, error) {
 	if p.ID != "" {
-		return fmt.Errorf("When adding an product we did not expect the ID to have a value but it got %q", p.ID)
+		return "", fmt.Errorf("When adding an product we did not expect the ID to have a value but it got %q", p.ID)
 	}
 	if p.CreatedDate != "" {
-		return fmt.Errorf("When adding an product we did not expect the CreatedDate to already be set but it was set to %q", p.CreatedDate)
+		return "", fmt.Errorf("When adding an product we did not expect the CreatedDate to already be set but it was set to %q", p.CreatedDate)
 	}
 
 	p.CreatedDate = time.Now().Format(time.RFC3339)
@@ -70,7 +70,7 @@ func (db *DynamoDB) AddProduct(p Product) error {
 
 	item, err := dynamodbattribute.MarshalMap(&p)
 	if err != nil {
-		return err
+		return "", err
 	}
 	item["type"] = &dynamodb.AttributeValue{S: aws.String("product")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
@@ -81,6 +81,6 @@ func (db *DynamoDB) AddProduct(p Product) error {
 		Item:      item,
 	})
 
-	return err
+	return p.ID, err
 }
 

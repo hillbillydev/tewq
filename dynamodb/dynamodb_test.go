@@ -25,7 +25,7 @@ func TestAddProduct(t *testing.T) {
 	is.NoErr(err)
 	defer tdb.Close()
 
-	err = tdb.AddProduct(product)
+	_, err = tdb.AddProduct(product)
 	is.NoErr(err)
 
 }
