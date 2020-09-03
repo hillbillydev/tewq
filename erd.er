@@ -11,6 +11,7 @@ title {label: "Tewq Entity Relationship Diagram", size: "20"}
   *person_id {label: "person_id, not null"}
   first_name {label: "varchar, not null"}
   last_name {label: "varchar, not null"}
+  my_new_att {label: "varchar, not null"}
 
 [order]
   *order_id {label: "varchar, not null"}

@@ -35,17 +35,17 @@ func TestSomething(t *testing.T) {
         is.NoErr(err)
     })
 
-    //t.Run("Should Add and Get Product.", func(t *testing.T) {
-    //    id := uuid.New()
+    t.Run("asd", func(t *testing.T) {
+        id := uuid.New()
 
-    //    err = tdb.AddProduct(dynamodb.Product{
-    //        ID:   id,
-    //        Name: "Add&Get",
-    //    })
-    //    is.NoErr(err)
-    //    p, err := tdb.GetProduct(id)
-    //    is.NoErr(err)
+        err = tdb.AddProduct(dynamodb.Product{
+            ID:   id,
+            Name: "Add&Get",
+        })
+        is.NoErr(err)
+        p, err := tdb.GetProduct(id)
+        is.NoErr(err)
 
-    //    is.Equal(p.ID.String(), id.String())
-    //})
+        is.Equal(p.ID.String(), id.String())
+    })
 }
