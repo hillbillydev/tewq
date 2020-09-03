@@ -15,13 +15,11 @@ func TestAddProduct(t *testing.T) {
 	is := is.New(t)
 	product := Product{
 		Name:        "Golf Club",
-        Description: "This is a product",
-        Price: 1000,
-        Weight: 1500,
-        Stock: 1,
-		CreatedDate: time.Now(),
-        Image: "s3://images/image.png",
-        Thumbnail: "s3://images/thumbnail.png",
+		Description: "This is a product",
+		Price:       1000,
+		Weight:      1500,
+		Image:       "s3://images/image.png",
+		Thumbnail:   "s3://images/thumbnail.png",
 	}
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)

@@ -52,8 +52,19 @@ func New(endpoint, tableName string) (*DynamoDB, error) {
 	}, nil
 }
 
+// AddProduct take a Product p and attempts to put that item into DynamoDB.
+// If the caller provides an ID on the product we will fail straight away.
 func (db *DynamoDB) AddProduct(p Product) error {
+	if p.ID != "" {
+		return fmt.Errorf("When adding an product we did not expect the ID to have a value but it got %q", p.ID)
+	}
+	if p.CreatedDate != "" {
+		return fmt.Errorf("When adding an product we did not expect the CreatedDate to already be set but it was set to %q", p.CreatedDate)
+	}
+
+	p.CreatedDate = time.Now().Format(time.RFC3339)
 	p.ID = uuid.New().String()
+
 	pk := fmt.Sprintf("PRODUCT#%s", p.ID)
 	sort := "METADATA#"
 
