@@ -50,6 +50,10 @@ title {label: "Tewq Entity Relationship Diagram", size: "20"}
   stock { label: "varchar, not null"}
   description {label: "varchar, not null"}
 
+[option]
+  *option_id {label: "varchar, not null"}
+  name { label: "varchar, not null"}
+
 [basket]
   *basket_id {label: "varchar, not null"}
 
@@ -60,5 +64,6 @@ order 1--* order_details
 
 product 1--* order_details
 product 1--1 category
+product 1--* option
 
 basket 1--* product
