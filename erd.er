@@ -1,5 +1,11 @@
 title {label: "Tewq Entity Relationship Diagram", size: "20"}
 
+# Cardinality    Syntax
+# 0 or 1         0
+# exactly 1      1
+# 0 or more      *
+# 1 or more      +
+
 # Nice colors from Erwiz:
 # red #fcecec
 # blue #ececfc
@@ -14,34 +20,45 @@ title {label: "Tewq Entity Relationship Diagram", size: "20"}
 
 [order]
   *order_id {label: "varchar, not null"}
+  *+customer_id {label: "customer_id, not null"}
+  amount {label: "int, not null"}
+  shipping_adress {label: "varchar, not null"}
+  order_date {label: "utcdate, not null"}
   status {label: "status, not null"}
   delivered {label: "utcdate, not null"}
+
+[order_details]
+  *order_details_id {label: "varchar, not null"}
+  *+product_id {label: "varchar, not null"}
+  *+order_id {label: "varchar, not null"}
+  price {label: "varchar, not null"}
+  quantity {label: "varchar, not null"}
+
+[category]
+  *category_id {label: "varchar, not null"}
+  name {label: "varchar, not null"}
+  description {label: "varchar, not null"}
 
 [product]
   *product_id {label: "varchar, not null"}
   name { label: "varchar, not null"}
+  price { label: "int, not null"}
+  weight { label: "int, not null"}
+  image { label: "varchar, not null"}
+  thumbnail { label: "varchar, not null"}
+  create_date { label: "varchar, not null"}
+  stock { label: "varchar, not null"}
   description {label: "varchar, not null"}
-
-[item]
-  *item_id {label: "varchar, not null"}
-  price {label: "decimal, not null"}
 
 [basket]
   *basket_id {label: "varchar, not null"}
 
-# Each relationship must be between exactly two entities, which need not
-# be distinct. Each entity in the relationship has exactly one of four
-# possible cardinalities:
-#
-# Cardinality    Syntax
-# 0 or 1         0
-# exactly 1      1
-# 0 or more      *
-# 1 or more      +
-
 person 1--1 basket
 person 1--* order
 
-basket 1--* item
+order 1--* order_details
 
-product 1--* item
+product 1--* order_details
+product 1--1 category
+
+basket 1--* product
