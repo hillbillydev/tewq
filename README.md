@@ -34,9 +34,7 @@ Me trying to apply what I have learned from [this book](https://www.dynamodbbook
 
 ```go
   func TestSomethingInDynamoDB(t *testing.T) {
-
     tdb, _ := NewTestDynamoDB() // creates a table in your DynamoDB instance.
-    is.NoErr(err)
 
     // If you comment out the Close method it will not delete the test database that got created.
     // This give you an opportunity to peek into the instance with NoSQL Workbench.
