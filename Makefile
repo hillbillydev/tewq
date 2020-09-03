@@ -7,10 +7,10 @@ target:
 init:
 	$(info [*] Bootstrapping CI system...)
 
-build-erd: # TODO FIX only works with Docker installed and on Mac...
 test:
 	go test ./...
 
+build-erd:
 	$(info [*] Bulilding Entity Relationship Diagram...)
 	cat erd.er | docker run --rm -i kaishuu0123/erd-go | docker run --rm -i risaacson/graphviz dot -T png > erd.png
 	open erd.png
