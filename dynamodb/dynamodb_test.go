@@ -112,8 +112,6 @@ func TestGetProduct(t *testing.T) {
 	is.Equal(p.Thumbnail, fetched.Thumbnail)
 
 	is.True(len(fetched.Options) == 2) // We provided 2 options, so why is it not there?
-	is.Equal(fetched.Options[1].Stock, 2)
-	is.Equal(fetched.Options[1].Socket, "Right")
 }
 
 type TestDynamoDB struct {
