@@ -196,7 +196,7 @@ type TestDynamoDB struct {
 // It then create a temporary test tables, with name looking like this Tewq-Test_2020-09-04_09-21-37.
 // To clean up your test resources you will have to call the Close() method.
 func NewTestDynamoDB() (*TestDynamoDB, error) {
-	tableName := fmt.Sprintf("%s_%s", "Tewq-Test", time.Now().Format("2006-01-02_15-04-05"))
+	tableName := fmt.Sprintf("%s_%s", "Tewq-Test", time.Now().Format("2006-01-02_15-04-05.000000"))
 
 	db, err := New("http://localhost:8000", tableName)
 	if err != nil {
