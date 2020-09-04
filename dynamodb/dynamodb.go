@@ -61,7 +61,7 @@ func New(endpoint, tableName string) (*DynamoDB, error) {
 }
 
 // AddProduct take a Product p and attempts to put that item into DynamoDB.
-func (db *DynamoDB) AddProduct(p Product) (*Product, error) {
+func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 
 	p.CreatedDate = time.Now().Format(time.RFC3339)
 	p.ID = uuid.New().String()
@@ -73,7 +73,7 @@ func (db *DynamoDB) AddProduct(p Product) (*Product, error) {
 
 	item, err := dynamodbattribute.MarshalMap(&p)
 	if err != nil {
-		return &p, err
+		return Product{}, err
 	}
 	item["type"] = &dynamodb.AttributeValue{S: aws.String("product")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
@@ -86,11 +86,11 @@ func (db *DynamoDB) AddProduct(p Product) (*Product, error) {
 		Item:      item,
 	})
 
-	return &p, err
+	return p, err
 }
 
 // AddOptionToProduct adds a single option to a product.
-func (db *DynamoDB) AddOptionToProduct(id string, option Option) (*Option, error) {
+func (db *DynamoDB) AddOptionToProduct(id string, option Option) (Option, error) {
 	option.ID = uuid.New().String()
 	option.CreatedDate = time.Now().Format(time.RFC3339)
 
@@ -99,7 +99,7 @@ func (db *DynamoDB) AddOptionToProduct(id string, option Option) (*Option, error
 
 	item, err := dynamodbattribute.MarshalMap(&option)
 	if err != nil {
-		return nil, err
+		return Option{}, err
 	}
 	item["type"] = &dynamodb.AttributeValue{S: aws.String("product_option")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
@@ -110,11 +110,11 @@ func (db *DynamoDB) AddOptionToProduct(id string, option Option) (*Option, error
 		Item:      item,
 	})
 
-	return &option, err
+	return option, err
 }
 
 // GetProduct fetches the product will all their options included.
-func (db *DynamoDB) GetProduct(id string) (*Product, error) {
+func (db *DynamoDB) GetProduct(id string) (Product, error) {
 	var result Product
 
 	res, err := db.db.Query(&dynamodb.QueryInput{
@@ -131,38 +131,38 @@ func (db *DynamoDB) GetProduct(id string) (*Product, error) {
 		ScanIndexForward: aws.Bool(true),
 	})
 	if err != nil {
-		return nil, err
+		return Product{}, err
 	}
 	if len(res.Items) == 0 {
 		// TODO error not found here?
-		return nil, nil
+		return Product{}, nil
 	}
 
 	metadata, options := res.Items[0], res.Items[1:]
 
 	err = dynamodbattribute.UnmarshalMap(metadata, &result)
 	if err != nil {
-		return nil, err
+		return Product{}, err
 	}
 
 	err = dynamodbattribute.UnmarshalListOfMaps(options, &result.Options)
 	if err != nil {
-		return nil, err
+		return Product{}, err
 	}
 
-	return &result, err
+	return result, err
 }
 
-func (db *DynamoDB) GetProductsByCategoryAndPrice(category string, from, to int) ([]*Product, error) {
+func (db *DynamoDB) GetProductsByCategoryAndPrice(category string, from, to int) ([]Product, error) {
 	return db.getProductsByCategoryAndPrice(category, from, to)
 }
 
-func (db *DynamoDB) GetProductsByCategory(category string) ([]*Product, error) {
+func (db *DynamoDB) GetProductsByCategory(category string) ([]Product, error) {
 	return db.getProductsByCategoryAndPrice(category, 0, math.MaxInt64)
 }
 
-func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int) ([]*Product, error) {
-	var result []*Product
+func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int) ([]Product, error) {
+	var result []Product
 
 	res, err := db.db.Query(&dynamodb.QueryInput{
 		TableName:              aws.String(db.tableName),
