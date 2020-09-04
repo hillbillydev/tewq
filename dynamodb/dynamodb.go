@@ -18,27 +18,27 @@ import (
 // Option represents an option for an Product.
 // For example, a product can have many different colors, sizes etc etc.
 type Option struct {
-	ID             string  `json:"id" dynamodbav:"Id, omitempty"`
-	CreatedDate    string  `json:"createdUtc" dynamodbav:"CreatedUtc, omitempty"`
-	Size           string  `json:"size" dynamodbav:"Size, omitempty"`     // TODO enum?
-	Socket         string  `json:"socket" dynamodbav:"Socket, omitempty"` // TODO enum?
-	Color          string  `json:"color" dynamodbav:"Color, omitempty"`   // TODO enum?
-	Stock          int     `json:"stock" dynamodbav:"Stock, omitempty"`
-	ShaftStiffness float64 `json:"shaftStiffness" dynamodbav:"ShaftStiffness, omitempty"`
+	ID             string  `json:"id" dynamodbav:"Id,omitempty"`
+	CreatedDate    string  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	Size           string  `json:"size" dynamodbav:"Size,omitempty"`     // TODO enum?
+	Socket         string  `json:"socket" dynamodbav:"Socket,omitempty"` // TODO enum?
+	Color          string  `json:"color" dynamodbav:"Color,omitempty"`   // TODO enum?
+	Stock          int     `json:"stock" dynamodbav:"Stock,omitempty"`
+	ShaftStiffness float64 `json:"shaftStiffness" dynamodbav:"ShaftStiffness,omitempty"`
 }
 
 // Product represents the product that customers buys.
 type Product struct {
-	ID          string   `json:"id" dynamodbav:"Id, omitempty"`
-	CreatedDate string   `json:"createdUtc" dynamodbav:"CreatedUtc, omitempty"`
-	Category    string   `json:"category" dynamodbav:"Category, omitempty"`
-	Name        string   `json:"name" dynamodbav:"Name, omitempty"`
-	Description string   `json:"description" dynamodbav:"Description, omitempty"`
-	Image       string   `json:"image" dynamodbav:"Image, omitempty"`
-	Thumbnail   string   `json:"thumbNail" dynamodbav:"ThumbNail, omitempty"`
-	Price       int      `json:"price" dynamodbav:"Price, omitempty"`
-	Weight      int      `json:"weight" dynamodbav:"Weight, omitempty"`
-	Options     []Option `json:"options" dynamodbav:"Options, omitempty"`
+	ID          string   `json:"id" dynamodbav:"Id,omitempty"`
+	CreatedDate string   `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	Category    string   `json:"category" dynamodbav:"Category,omitempty"`
+	Name        string   `json:"name" dynamodbav:"Name,omitempty"`
+	Description string   `json:"description" dynamodbav:"Description,omitempty"`
+	Image       string   `json:"image" dynamodbav:"Image,omitempty"`
+	Thumbnail   string   `json:"thumbNail" dynamodbav:"ThumbNail,omitempty"`
+	Price       int      `json:"price" dynamodbav:"Price,omitempty"`
+	Weight      int      `json:"weight" dynamodbav:"Weight,omitempty"`
+	Options     []Option `json:"options" dynamodbav:"Options,omitempty"`
 }
 
 // Basket contains the Products an customer wants to buy in the future.
@@ -98,7 +98,6 @@ func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 	if err != nil {
 		return Product{}, err
 	}
-
 	item["Type"] = &dynamodb.AttributeValue{S: aws.String("product")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
