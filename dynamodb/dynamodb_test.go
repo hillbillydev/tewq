@@ -150,6 +150,7 @@ func (t *TestDynamoDB) createTestTable() error {
 	}
 
 	_, err := t.db.CreateTable(&dynamodb.CreateTableInput{
+		TableName: aws.String(t.tableName),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
 				AttributeName: aws.String("PK"),
@@ -157,6 +158,14 @@ func (t *TestDynamoDB) createTestTable() error {
 			},
 			{
 				AttributeName: aws.String("SK"),
+				AttributeType: aws.String("S"),
+			},
+			{
+				AttributeName: aws.String("GS1PK"),
+				AttributeType: aws.String("S"),
+			},
+			{
+				AttributeName: aws.String("GS1SK"),
 				AttributeType: aws.String("S"),
 			},
 		},
@@ -170,11 +179,32 @@ func (t *TestDynamoDB) createTestTable() error {
 				KeyType:       aws.String("RANGE"),
 			},
 		},
+		GlobalSecondaryIndexes: []*dynamodb.GlobalSecondaryIndex{
+			{
+				IndexName: aws.String("GS1"),
+				KeySchema: []*dynamodb.KeySchemaElement{
+					{
+						AttributeName: aws.String("GS1PK"),
+						KeyType:       aws.String("HASH"),
+					},
+					{
+						AttributeName: aws.String("GS1SK"),
+						KeyType:       aws.String("RANGE"),
+					},
+				},
+				Projection: &dynamodb.Projection{
+					ProjectionType: aws.String(dynamodb.ProjectionTypeAll),
+				},
+				ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(10),
+					WriteCapacityUnits: aws.Int64(10),
+				},
+			},
+		},
 		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(10),
 			WriteCapacityUnits: aws.Int64(10),
 		},
-		TableName: aws.String(t.tableName),
 	})
 
 	return err
