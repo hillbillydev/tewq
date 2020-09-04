@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/google/uuid"
 	"github.com/matryer/is"
 )
 
@@ -186,6 +187,38 @@ func TestGetProductsByCategoryAndPrice(t *testing.T) {
 	is.NoErr(err)
 	is.True(len(fetched) == 1) // should be 1 products with category "Clubs"
 	is.Equal(fetched[0].Price, products[2].Price)
+}
+
+func TestAddBasketItem(t *testing.T) {
+	customerId := uuid.New().String()
+	is := is.New(t)
+	product := Product{
+		Name:     "Golf Club",
+		Category: "Shoes",
+		Options: []Option{
+			{
+				Color: "Red",
+				Stock: 2,
+			},
+		},
+	}
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	//defer tdb.Close()
+
+	// Prepare data to get fetched
+	p, err := tdb.AddProduct(product)
+	is.NoErr(err)
+	o, err := tdb.AddOptionToProduct(p.ID, product.Options[0])
+	is.NoErr(err)
+
+	err = tdb.AddBasketItem(BasketItem{
+		CustomerID: customerId,
+		ProductID: p.ID,
+		ProductOptionID: o.ID,
+	})
+	is.NoErr(err)
 }
 
 type TestDynamoDB struct {
