@@ -54,7 +54,7 @@ func TestAddOptionToProduct(t *testing.T) {
 	id, err := tdb.AddProduct(product)
 	is.NoErr(err)
 
-	err = tdb.AddOptionToProduct(id, option)
+	_, err = tdb.AddOptionToProduct(id, option)
 	is.NoErr(err)
 }
 
