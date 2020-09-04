@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/google/uuid"
 	"github.com/matryer/is"
 )
 
@@ -196,7 +195,7 @@ func TestGetProductsByCategoryAndPrice(t *testing.T) {
 }
 
 func TestAddBasketItem(t *testing.T) {
-	customerId := uuid.New().String()
+	customerId := NewSortableID()
 	is := is.New(t)
 	product := Product{
 		Name:     "Golf Club",
