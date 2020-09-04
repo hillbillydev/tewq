@@ -43,7 +43,6 @@ type Basket struct {
 type DynamoDB struct {
 	db        *dynamodb.DynamoDB
 	tableName string
-	endpoint  string
 }
 
 func New(endpoint, tableName string) (*DynamoDB, error) {
