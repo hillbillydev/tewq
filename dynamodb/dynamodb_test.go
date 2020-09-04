@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/google/uuid"
 	"github.com/matryer/is"
 )
 
@@ -185,52 +186,17 @@ func TestGetProductsByCategoryAndPrice(t *testing.T) {
 	}
 
 	fetched, _, err := tdb.GetProductsByCategory(&GetProductsByCategoryInput{
-		Category: categoryToFetch,
+		Category:  categoryToFetch,
 		FromPrice: 500,
-		ToPrice: 600,
+		ToPrice:   600,
 	})
 	is.NoErr(err)
 	is.True(len(fetched) == 1) // should be 1 products with category "Clubs"
 	is.Equal(fetched[0].Price, products[2].Price)
 }
 
-func TestGetProductsByCategoryPagination(t *testing.T) {
-	is := is.New(t)
-	categoryToFetch := "Clubs"
-
-	tdb, err := NewTestDynamoDB()
-	is.NoErr(err)
-	defer tdb.Close()
-
-	// Prepare data to get fetched
-	for i := 9; i != 0; i-- {
-		// Add 9 golf clubs to the database.
-		_, err := tdb.AddProduct(Product{
-			Name:     fmt.Sprintf("Test%d", i),
-			Category: categoryToFetch,
-		})
-		is.NoErr(err)
-	}
-
-	fetched, last, err := tdb.GetProductsByCategory(&GetProductsByCategoryInput{
-		Category: categoryToFetch,
-		PaginationLimit: 5,
-	})
-	is.NoErr(err)
-	is.True(len(fetched) == 5)
-	is.True(last != "")
-
-	fetched, last, err = tdb.GetProductsByCategory(&GetProductsByCategoryInput{
-		Category: categoryToFetch,
-		PreviousKey: last,
-	})
-	is.NoErr(err)
-	is.True(len(fetched) == 4)
-	is.True(last == "")
-}
-
 func TestAddBasketItem(t *testing.T) {
-	customerID := NewSortableID()
+	customerId := uuid.New().String()
 	is := is.New(t)
 	product := Product{
 		Name:     "Golf Club",
@@ -245,7 +211,7 @@ func TestAddBasketItem(t *testing.T) {
 
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)
-	defer tdb.Close()
+	//defer tdb.Close()
 
 	// Prepare data to get fetched
 	p, err := tdb.AddProduct(product)
@@ -254,7 +220,7 @@ func TestAddBasketItem(t *testing.T) {
 	is.NoErr(err)
 
 	err = tdb.AddBasketItem(BasketItem{
-		CustomerID:      customerID,
+		CustomerID:      customerId,
 		ProductID:       p.ID,
 		ProductOptionID: o.ID,
 	})
