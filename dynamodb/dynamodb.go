@@ -91,6 +91,8 @@ func (db *DynamoDB) AddProduct(p Product) (uuid.UUID, error) {
 	return p.ID, err
 }
 
+// AddOptionToProduct adds a single option to a product.
+// It returns an error if you try to provide either an ID or CreatedDate.
 func (db *DynamoDB) AddOptionToProduct(id uuid.UUID, option Option) (uuid.UUID, error) {
 	if option.ID != uuid.Nil {
 		return uuid.Nil, fmt.Errorf("When adding an product we did not expect the ID to have a value but it got %q", id)
