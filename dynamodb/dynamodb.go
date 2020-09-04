@@ -13,7 +13,7 @@ import (
 
 type Option struct {
 	ID             uuid.UUID `json:"id"`
-	CreatedDate    string    `json:"createdDate"`
+	CreatedDate    time.Time `json:"createdDate"`
 	Stock          int       `json:"stock" dynamodbav:",omitempty"`
 	ShaftStiffness float64   `json:"shaftStiffness" dynamodbav:",omitempty"`
 	Size           string    `json:"size" dynamodbav:",omitempty"`   // TODO enum?
@@ -23,7 +23,7 @@ type Option struct {
 
 type Product struct {
 	ID          uuid.UUID `json:"id"`
-	CreatedDate string    `json:"createdDate"` // TODO Special time here?
+	CreatedDate time.Time `json:"createdDate"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Price       int       `json:"price"`
@@ -63,11 +63,11 @@ func (db *DynamoDB) AddProduct(p Product) (uuid.UUID, error) {
 	if p.ID != uuid.Nil {
 		return uuid.Nil, fmt.Errorf("When adding an product we did not expect the ID to have a value but it got %q", p.ID)
 	}
-	if p.CreatedDate != "" {
+	if !p.CreatedDate.IsZero() {
 		return uuid.Nil, fmt.Errorf("When adding an product we did not expect the CreatedDate to already be set but it was set to %q", p.CreatedDate)
 	}
 
-	p.CreatedDate = time.Now().Format(time.RFC3339)
+	p.CreatedDate = time.Now()
 	p.ID = uuid.New()
 
 	pk := fmt.Sprintf("PRODUCT#%s", p.ID)
@@ -81,6 +81,7 @@ func (db *DynamoDB) AddProduct(p Product) (uuid.UUID, error) {
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
 	item["id"] = &dynamodb.AttributeValue{S: aws.String(p.ID.String())}
+	item["createdUtc"] = &dynamodb.AttributeValue{S: aws.String(p.CreatedDate.Format(time.RFC3339))}
 
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(db.tableName),
@@ -94,11 +95,11 @@ func (db *DynamoDB) AddOptionToProduct(id uuid.UUID, option Option) (uuid.UUID, 
 	if option.ID != uuid.Nil {
 		return uuid.Nil, fmt.Errorf("When adding an product we did not expect the ID to have a value but it got %q", id)
 	}
-	if option.CreatedDate != "" {
+	if !option.CreatedDate.IsZero() {
 		return uuid.Nil, fmt.Errorf("When adding an product we did not expect the CreatedDate to already be set but it was set to %q", option.CreatedDate)
 	}
 	option.ID = uuid.New()
-	option.CreatedDate = time.Now().Format(time.RFC3339)
+	option.CreatedDate = time.Now()
 
 	pk := fmt.Sprintf("PRODUCT#%s", id)
 	sort := fmt.Sprintf("OPTION#%s", option.CreatedDate)
@@ -111,6 +112,7 @@ func (db *DynamoDB) AddOptionToProduct(id uuid.UUID, option Option) (uuid.UUID, 
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
 	item["id"] = &dynamodb.AttributeValue{S: aws.String(option.ID.String())}
+	item["createdUtc"] = &dynamodb.AttributeValue{S: aws.String(option.CreatedDate.Format(time.RFC3339))}
 
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(db.tableName),
