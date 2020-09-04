@@ -51,10 +51,10 @@ func TestAddOptionToProduct(t *testing.T) {
 	is.NoErr(err)
 	defer tdb.Close()
 
-	id, err := tdb.AddProduct(product)
+	p, err := tdb.AddProduct(product)
 	is.NoErr(err)
 
-	_, err = tdb.AddOptionToProduct(id, option)
+	_, err = tdb.AddOptionToProduct(p.ID, option)
 	is.NoErr(err)
 }
 
@@ -77,8 +77,8 @@ func TestGetProduct(t *testing.T) {
 			Socket:         "Right",
 		},
 		{
-			Color:          "red",
-			Stock:          1,
+			Color:          "green",
+			Stock:          2,
 			Size:           "Medium",
 			ShaftStiffness: 11.5,
 			Socket:         "Right",
@@ -87,22 +87,29 @@ func TestGetProduct(t *testing.T) {
 
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)
-	//defer tdb.Close()
+	defer tdb.Close()
 
 	// Prepare data to get fetched
-	id, err := tdb.AddProduct(product)
+	p, err := tdb.AddProduct(product)
 	is.NoErr(err)
 	for _, op := range options {
-		_, err = tdb.AddOptionToProduct(id, op)
+		_, err := tdb.AddOptionToProduct(p.ID, op)
 		is.NoErr(err)
 	}
 
-	p, err := tdb.GetProduct(id)
+	fetched, err := tdb.GetProduct(p.ID)
 	is.NoErr(err)
 
-	is.True(len(p.Options) == 2) // We provided 2 options, so why is it not there?
-	fmt.Println(p)
-	is.Equal(product.Name, p.Name)
+	is.Equal(p.Name, fetched.Name)
+	is.Equal(p.Description, fetched.Description)
+	is.Equal(p.Weight, fetched.Weight)
+	is.Equal(p.Price, fetched.Price)
+	is.Equal(p.Image, fetched.Image)
+	is.Equal(p.Thumbnail, fetched.Thumbnail)
+
+	is.True(len(fetched.Options) == 2) // We provided 2 options, so why is it not there?
+	is.Equal(fetched.Options[1].Stock, 2)
+	is.Equal(fetched.Options[1].Socket, "Right")
 }
 
 type TestDynamoDB struct {
