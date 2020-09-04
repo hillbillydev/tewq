@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -66,6 +67,8 @@ func (db *DynamoDB) AddProduct(p Product) (*Product, error) {
 
 	pk := fmt.Sprintf("PRODUCT#%s", p.ID)
 	sort := "METADATA#"
+	gs1pk := fmt.Sprintf("PRODUCT#CATEGORY#%s", p.Category)
+	gs1sk := strconv.Itoa(p.Price)
 
 	item, err := dynamodbattribute.MarshalMap(&p)
 	if err != nil {
@@ -74,6 +77,8 @@ func (db *DynamoDB) AddProduct(p Product) (*Product, error) {
 	item["type"] = &dynamodb.AttributeValue{S: aws.String("product")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
+	item["GS1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
+	item["GS1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
 
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(db.tableName),
