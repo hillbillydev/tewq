@@ -58,6 +58,53 @@ func TestAddOptionToProduct(t *testing.T) {
 	is.NoErr(err)
 }
 
+func TestGetProduct(t *testing.T) {
+	is := is.New(t)
+	product := Product{
+		Name:        "Golf Club",
+		Description: "This is a product",
+		Price:       1000,
+		Weight:      1500,
+		Image:       "s3://images/image.png",
+		Thumbnail:   "s3://images/thumbnail.png",
+	}
+	options := []Option{
+		{
+			Color:          "red",
+			Stock:          1,
+			Size:           "Medium",
+			ShaftStiffness: 11.5,
+			Socket:         "Right",
+		},
+		{
+			Color:          "red",
+			Stock:          1,
+			Size:           "Medium",
+			ShaftStiffness: 11.5,
+			Socket:         "Right",
+		},
+	}
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	//defer tdb.Close()
+
+	// Prepare data to get fetched
+	id, err := tdb.AddProduct(product)
+	is.NoErr(err)
+	for _, op := range options {
+		_, err = tdb.AddOptionToProduct(id, op)
+		is.NoErr(err)
+	}
+
+	p, err := tdb.GetProduct(id)
+	is.NoErr(err)
+
+	is.True(len(p.Options) == 2) // We provided 2 options, so why is it not there?
+	fmt.Println(p)
+	is.Equal(product.Name, p.Name)
+}
+
 type TestDynamoDB struct {
 	*DynamoDB
 }

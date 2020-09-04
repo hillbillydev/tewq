@@ -13,17 +13,17 @@ import (
 
 type Option struct {
 	ID             uuid.UUID `json:"id"`
-	CreatedDate    time.Time `json:"createdDate"`
+	CreatedDate    time.Time `json:"createdUtc"`
 	Stock          int       `json:"stock" dynamodbav:",omitempty"`
-	ShaftStiffness float64   `json:"shaftStiffness" dynamodbav:",omitempty"`
-	Size           string    `json:"size" dynamodbav:",omitempty"`   // TODO enum?
-	Socket         string    `json:"socket" dynamodbav:",omitempty"` // TODO enum?
-	Color          string    `json:"socket" dynamodbav:",omitempty"` // TODO enum?
+	ShaftStiffness float64   `json:"shaftStiffness" dynamodbav:"shaftStiffness,omitempty"`
+	Size           string    `json:"size" dynamodbav:"size,omitempty"`     // TODO enum?
+	Socket         string    `json:"socket" dynamodbav:"socket,omitempty"` // TODO enum?
+	Color          string    `json:"socket" dynamodbav:"color,omitempty"`  // TODO enum?
 }
 
 type Product struct {
 	ID          uuid.UUID `json:"id"`
-	CreatedDate time.Time `json:"createdDate"`
+	CreatedDate time.Time `json:"createdUtc"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Price       int       `json:"price"`
@@ -123,3 +123,44 @@ func (db *DynamoDB) AddOptionToProduct(id uuid.UUID, option Option) (uuid.UUID, 
 
 	return option.ID, err
 }
+
+func (db *DynamoDB) GetProduct(id uuid.UUID) (*Product, error) {
+	var result Product
+
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		KeyConditionExpression: aws.String("#PK = :pk"),
+		ExpressionAttributeNames: map[string]*string{
+			"#PK": aws.String("PK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":pk": {
+				S: aws.String(fmt.Sprintf("PRODUCT#%s", id)),
+			},
+		},
+		ScanIndexForward: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Items) == 0 {
+		// TODO error not found here?
+		return nil, nil
+	}
+
+	metadata, options := res.Items[0], res.Items[1:]
+
+	err = dynamodbattribute.UnmarshalMap(metadata, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	err = dynamodbattribute.UnmarshalListOfMaps(options, &result.Options)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, err
+}
+
+
