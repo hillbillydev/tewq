@@ -38,12 +38,19 @@ type Product struct {
 	Thumbnail   string   `json:"thumbNail" dynamodbav:"ThumbNail,omitempty"`
 	Price       int      `json:"price" dynamodbav:"Price,omitempty"`
 	Weight      int      `json:"weight" dynamodbav:"Weight,omitempty"`
-	Options     []Option `json:"options" dynamodbav:"Options,omitempty"`
+	Sale        int      `json:"weight" dynamodbav:"Sale,omitempty"`
+	Options     []Option `json:"options" dynamodbav:"-"`
 }
 
 // Basket contains the Products an customer wants to buy in the future.
 type Basket struct {
 	Products []Product `json:"products"`
+}
+
+type BasketItem struct {
+	CustomerID      string `json:"customerId" dynamodbav:"CustomerId"`
+	ProductID       string `json:"productId" dynamodbav:"ProductId"`
+	ProductOptionID string `json:"customerId" dynamodbav:"ProductOptionId"`
 }
 
 // BasketItem contains the pointers to which customer
@@ -413,4 +420,24 @@ func decodePaginationKey(pkey ProductCategoryPaginationKey) map[string]*dynamodb
 
 func zerosPricePadding(i int) string {
 	return fmt.Sprintf("%015d", i)
+}
+
+func (db *DynamoDB) AddBasketItem(item BasketItem) error {
+	pk := fmt.Sprintf("BASKET#%s", item.CustomerID)
+	sort := fmt.Sprintf("PRODUCT#%s", time.Now().Format(time.RFC3339))
+
+	i, err := dynamodbattribute.MarshalMap(&item)
+	if err != nil {
+		return err
+	}
+	i["Type"] = &dynamodb.AttributeValue{S: aws.String("BasketItem")}
+	i["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
+	i["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
+
+	_, err = db.db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(db.tableName),
+		Item:      i,
+	})
+
+	return err
 }
