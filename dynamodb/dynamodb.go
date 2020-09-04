@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -77,8 +78,8 @@ func (db *DynamoDB) AddProduct(p Product) (*Product, error) {
 	item["type"] = &dynamodb.AttributeValue{S: aws.String("product")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
-	item["GS1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
-	item["GS1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
+	item["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
+	item["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
 
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(db.tableName),
@@ -150,4 +151,51 @@ func (db *DynamoDB) GetProduct(id string) (*Product, error) {
 	}
 
 	return &result, err
+}
+
+func (db *DynamoDB) GetProductsByCategoryAndPrice(category string, from, to int) ([]*Product, error) {
+	return db.getProductsByCategoryAndPrice(category, from, to)
+}
+
+func (db *DynamoDB) GetProductsByCategory(category string) ([]*Product, error) {
+	return db.getProductsByCategoryAndPrice(category, 0, math.MaxInt64)
+}
+
+func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int) ([]*Product, error) {
+	var result []*Product
+
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		IndexName:              aws.String("GSI1"),
+		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk And #GSI1SK BETWEEN :from AND :to"),
+		ExpressionAttributeNames: map[string]*string{
+			"#GSI1PK": aws.String("GSI1PK"),
+			"#GSI1SK": aws.String("GSI1SK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":gsi1pk": {
+				S: aws.String(fmt.Sprintf("PRODUCT#CATEGORY#%s", category)),
+			},
+			":from": {
+				S: aws.String(strconv.Itoa(from)),
+			},
+			":to": {
+				S: aws.String(strconv.Itoa(to)),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Items) == 0 {
+		// TODO error not found here?
+		return nil, nil
+	}
+
+	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, err
 }

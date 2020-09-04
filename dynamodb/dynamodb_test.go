@@ -114,6 +114,80 @@ func TestGetProduct(t *testing.T) {
 	is.True(len(fetched.Options) == 2) // We provided 2 options, so why is it not there?
 }
 
+func TestGetProductsByCategory(t *testing.T) {
+	is := is.New(t)
+	categoryToFetch := "Clubs"
+	products := []Product{
+		{
+			Name:     "Golf Club",
+			Category: "Shoes",
+			Price:    1000,
+		},
+		{
+			Name:     "Golf Club",
+			Category: categoryToFetch,
+			Price:    1000,
+		},
+		{
+			Name:     "Golf Club 2",
+			Category: categoryToFetch,
+			Price:    500,
+		},
+	}
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	defer tdb.Close()
+
+	// Prepare data to get fetched
+	for _, p := range products {
+		_, err := tdb.AddProduct(p)
+		is.NoErr(err)
+	}
+
+	fetched, err := tdb.GetProductsByCategory(categoryToFetch)
+	is.NoErr(err)
+
+	is.True(len(fetched) == 2) // should be 2 products with category "Clubs"
+}
+
+func TestGetProductsByCategoryAndPrice(t *testing.T) {
+	is := is.New(t)
+	categoryToFetch := "Clubs"
+	products := []Product{
+		{
+			Name:     "Golf Club",
+			Category: "Shoes",
+			Price:    1000,
+		},
+		{
+			Name:     "Golf Club",
+			Category: categoryToFetch,
+			Price:    1000,
+		},
+		{
+			Name:     "Golf Club 2",
+			Category: categoryToFetch,
+			Price:    500,
+		},
+	}
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	defer tdb.Close()
+
+	// Prepare data to get fetched
+	for _, p := range products {
+		_, err := tdb.AddProduct(p)
+		is.NoErr(err)
+	}
+
+	fetched, err := tdb.GetProductsByCategoryAndPrice(categoryToFetch, 500, 600)
+	is.NoErr(err)
+	is.True(len(fetched) == 1) // should be 1 products with category "Clubs"
+	is.Equal(fetched[0].Price, products[2].Price)
+}
+
 type TestDynamoDB struct {
 	*DynamoDB
 }
@@ -163,11 +237,11 @@ func (t *TestDynamoDB) createTestTable() error {
 				AttributeType: aws.String("S"),
 			},
 			{
-				AttributeName: aws.String("GS1PK"),
+				AttributeName: aws.String("GSI1PK"),
 				AttributeType: aws.String("S"),
 			},
 			{
-				AttributeName: aws.String("GS1SK"),
+				AttributeName: aws.String("GSI1SK"),
 				AttributeType: aws.String("S"),
 			},
 		},
@@ -183,14 +257,14 @@ func (t *TestDynamoDB) createTestTable() error {
 		},
 		GlobalSecondaryIndexes: []*dynamodb.GlobalSecondaryIndex{
 			{
-				IndexName: aws.String("GS1"),
+				IndexName: aws.String("GSI1"),
 				KeySchema: []*dynamodb.KeySchemaElement{
 					{
-						AttributeName: aws.String("GS1PK"),
+						AttributeName: aws.String("GSI1PK"),
 						KeyType:       aws.String("HASH"),
 					},
 					{
-						AttributeName: aws.String("GS1SK"),
+						AttributeName: aws.String("GSI1SK"),
 						KeyType:       aws.String("RANGE"),
 					},
 				},
