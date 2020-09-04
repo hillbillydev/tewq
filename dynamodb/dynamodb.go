@@ -24,6 +24,7 @@ type Option struct {
 type Product struct {
 	ID          string   `json:"id"`
 	CreatedDate string   `json:"createdUtc"`
+	Category    string   `json:"category"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Price       int      `json:"price"`

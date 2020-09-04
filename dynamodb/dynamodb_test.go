@@ -16,6 +16,7 @@ func TestAddProduct(t *testing.T) {
 	product := Product{
 		Name:        "Golf Club",
 		Description: "This is a product",
+		Category:    "Club",
 		Price:       1000,
 		Weight:      1500,
 		Image:       "s3://images/image.png",
@@ -34,6 +35,7 @@ func TestAddOptionToProduct(t *testing.T) {
 	product := Product{
 		Name:        "Golf Club",
 		Description: "This is a product",
+		Category:    "Club",
 		Price:       1000,
 		Weight:      1500,
 		Image:       "s3://images/image.png",
@@ -62,6 +64,7 @@ func TestGetProduct(t *testing.T) {
 	is := is.New(t)
 	product := Product{
 		Name:        "Golf Club",
+		Category:    "Club",
 		Description: "This is a product",
 		Price:       1000,
 		Weight:      1500,
@@ -105,6 +108,7 @@ func TestGetProduct(t *testing.T) {
 	is.Equal(p.Weight, fetched.Weight)
 	is.Equal(p.Price, fetched.Price)
 	is.Equal(p.Image, fetched.Image)
+	is.Equal(p.Category, fetched.Category)
 	is.Equal(p.Thumbnail, fetched.Thumbnail)
 
 	is.True(len(fetched.Options) == 2) // We provided 2 options, so why is it not there?
