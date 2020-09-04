@@ -12,20 +12,25 @@ import (
 )
 
 type Option struct {
-	ID string `json:"id"`
+	ID             string  `json:"id"` // TODO make this in UUID instead...
+	CreatedDate    string  `json:"createdDate"`
+	Stock          int     `json:"stock" dynamodbav:",omitempty"`
+	ShaftStiffness float64 `json:"shaftStiffness" dynamodbav:",omitempty"`
+	Size           string  `json:"size" dynamodbav:",omitempty"`   // TODO enum?
+	Socket         string  `json:"socket" dynamodbav:",omitempty"` // TODO enum?
+	Color          string  `json:"socket" dynamodbav:",omitempty"` // TODO enum?
 }
 
 type Product struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Price       int       `json:"price"`
-	Weight      int       `json:"weight"`
-	Image       string    `json:"image"`
-	Thumbnail   string    `json:"thumbNail"`
-	CreatedDate time.Time `json:"createdDate"`
-	Stock       int       `json:"stock"`
-    Options     []Option  `json:"options" dynamodbav:"-"`
+	ID          string   `json:"id"`
+	CreatedDate string   `json:"createdDate"` // TODO Special time here?
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Price       int      `json:"price"`
+	Weight      int      `json:"weight"`
+	Image       string   `json:"image"`
+	Thumbnail   string   `json:"thumbNail"`
+	Options     []Option `json:"options" dynamodbav:",omitempty"`
 }
 
 type Basket struct {
@@ -84,3 +89,31 @@ func (db *DynamoDB) AddProduct(p Product) (string, error) {
 	return p.ID, err
 }
 
+func (db *DynamoDB) AddOptionToProduct(id string, option Option) error {
+	if option.ID != "" {
+		return fmt.Errorf("When adding an product we did not expect the ID to have a value but it got %q", id)
+	}
+	if option.CreatedDate != "" {
+		return fmt.Errorf("When adding an product we did not expect the CreatedDate to already be set but it was set to %q", option.CreatedDate)
+	}
+	option.ID = uuid.New().String()
+	option.CreatedDate = time.Now().Format(time.RFC3339)
+
+	pk := fmt.Sprintf("PRODUCT#%s", id)
+	sort := fmt.Sprintf("OPTION#%s", option.CreatedDate)
+
+	item, err := dynamodbattribute.MarshalMap(&option)
+	if err != nil {
+		return err
+	}
+	item["type"] = &dynamodb.AttributeValue{S: aws.String("product_option")}
+	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
+	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
+
+	_, err = db.db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(db.tableName),
+		Item:      item,
+	})
+
+	return err
+}

@@ -27,7 +27,35 @@ func TestAddProduct(t *testing.T) {
 
 	_, err = tdb.AddProduct(product)
 	is.NoErr(err)
+}
 
+func TestAddOptionToProduct(t *testing.T) {
+	is := is.New(t)
+	product := Product{
+		Name:        "Golf Club",
+		Description: "This is a product",
+		Price:       1000,
+		Weight:      1500,
+		Image:       "s3://images/image.png",
+		Thumbnail:   "s3://images/thumbnail.png",
+	}
+	option := Option{
+		Color:          "red",
+		Stock:          1,
+		Size:           "Medium",
+		ShaftStiffness: 11.5,
+		Socket:         "Right",
+	}
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	defer tdb.Close()
+
+	id, err := tdb.AddProduct(product)
+	is.NoErr(err)
+
+	err = tdb.AddOptionToProduct(id, option)
+	is.NoErr(err)
 }
 
 type TestDynamoDB struct {

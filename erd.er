@@ -43,16 +43,21 @@ title {label: "Tewq Entity Relationship Diagram", size: "20"}
   *product_id {label: "varchar, not null"}
   name { label: "varchar, not null"}
   price { label: "int, not null"}
+  sale { label: "int, not null"}
   weight { label: "int, not null"}
   image { label: "varchar, not null"}
   thumbnail { label: "varchar, not null"}
   create_date { label: "varchar, not null"}
-  stock { label: "varchar, not null"}
   description {label: "varchar, not null"}
 
 [option]
   *option_id {label: "varchar, not null"}
-  name { label: "varchar, not null"}
+  color { label: "color, null"}
+  size { label: "size, null"}
+  socket { label: "socket, null"}
+  shaft_stiffness { label: "float, null"}
+  stock { label: "int, not null"}
+
 
 [basket]
   *basket_id {label: "varchar, not null"}
