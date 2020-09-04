@@ -14,26 +14,26 @@ import (
 )
 
 type Option struct {
-	ID             string  `json:"id"`
-	CreatedDate    string  `json:"createdUtc"`
-	Stock          int     `json:"stock" dynamodbav:",omitempty"`
-	ShaftStiffness float64 `json:"shaftStiffness" dynamodbav:"shaftStiffness,omitempty"`
-	Size           string  `json:"size" dynamodbav:"size,omitempty"`     // TODO enum?
-	Socket         string  `json:"socket" dynamodbav:"socket,omitempty"` // TODO enum?
-	Color          string  `json:"socket" dynamodbav:"color,omitempty"`  // TODO enum?
+	ID             string  `json:"id" dynamodbav:"Id, omitempty"`
+	CreatedDate    string  `json:"createdUtc" dynamodbav:"CreatedUtc, omitempty"`
+	Size           string  `json:"size" dynamodbav:"Size, omitempty"`     // TODO enum?
+	Socket         string  `json:"socket" dynamodbav:"Socket, omitempty"` // TODO enum?
+	Color          string  `json:"color" dynamodbav:"Color, omitempty"` // TODO enum?
+	Stock          int     `json:"stock" dynamodbav:"Stock, omitempty"`
+	ShaftStiffness float64 `json:"shaftStiffness" dynamodbav:"ShaftStiffness, omitempty"`
 }
 
 type Product struct {
-	ID          string   `json:"id"`
-	CreatedDate string   `json:"createdUtc"`
-	Category    string   `json:"category"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Price       int      `json:"price"`
-	Weight      int      `json:"weight"`
-	Image       string   `json:"image"`
-	Thumbnail   string   `json:"thumbNail"`
-	Options     []Option `json:"options" dynamodbav:",omitempty"`
+	ID          string   `json:"id" dynamodbav:"Id, omitempty"`
+	CreatedDate string   `json:"createdUtc" dynamodbav:"CreatedUtc, omitempty"`
+	Category    string   `json:"category" dynamodbav:"Category, omitempty"`
+	Name        string   `json:"name" dynamodbav:"Name, omitempty"`
+	Description string   `json:"description" dynamodbav:"Description, omitempty"`
+	Image       string   `json:"image" dynamodbav:"Image, omitempty"`
+	Thumbnail   string   `json:"thumbNail" dynamodbav:"ThumbNail, omitempty"`
+	Price       int      `json:"price" dynamodbav:"Price, omitempty"`
+	Weight      int      `json:"weight" dynamodbav:"Weight, omitempty"`
+	Options     []Option `json:"options" dynamodbav:"Options, omitempty"`
 }
 
 type Basket struct {
