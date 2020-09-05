@@ -1,3 +1,4 @@
+package dynamodb
 
 import (
 	"testing"

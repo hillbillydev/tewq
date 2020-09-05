@@ -387,7 +387,7 @@ func (db *DynamoDB) AddBasketItem(item BasketItem) error {
 
 type SortableID ksuid.KSUID
 
-func NewSortableID() SortableID         { return SortableID(ksuid.New()) }
+func NewSortableID() SortableID      { return SortableID(ksuid.New()) }
 func (id SortableID) String() string { return ksuid.KSUID(id).String() }
 
 func (id *SortableID) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
