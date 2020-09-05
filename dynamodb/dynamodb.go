@@ -229,8 +229,10 @@ func (db *DynamoDB) AddBasketItem(item BasketItem) error {
 
 type SortableID ksuid.KSUID
 
-func NewSortableID() SortableID         { return SortableID(ksuid.New()) }
-func (id SortableID) String() string { return ksuid.KSUID(id).String() }
+// NewSortableID creates a new sortable id.
+func NewSortableID() SortableID { return SortableID(ksuid.New()) }
+// String satisfies the Stringer interface.
+func (id SortableID) String() string    { return ksuid.KSUID(id).String() }
 
 func (id *SortableID) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
 	v := fmt.Sprintf("%s", id)
@@ -247,8 +249,7 @@ func (id *SortableID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValu
 	if err != nil {
 		return err
 	}
-	sid := SortableID(v)
-	id = &sid
+	*id = SortableID(v)
 
 	return nil
 }
