@@ -85,6 +85,7 @@ func (db *DynamoDB) AddUser(u User) (User, error) {
 	// item["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
 	// item["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
 
+	//TODO: checkCond deprecated since uuid is generated in local scope
 	//so we don't overwrite an existing user metadata item
 	checkCond := "attribute_not_exists(PK) AND attribute_not_exists(SK)"
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
