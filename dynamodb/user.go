@@ -8,18 +8,28 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/google/uuid"
 )
 
 type User struct {
-	ID          string `json:"id"`
-	CreatedDate string `json:"createdDate"`
-	Email       string `json:"email"`
-	FirstName   string `json:"firstName"`
-	LastName    string `json:"lastName"`
+	ID          SortableID `json:"id" dynamodbav:"Id"`
+	CreatedDate string     `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	Email       string     `json:"email" dynamodbav:"Email"`
+	FirstName   string     `json:"firstName" dynamodbav:"Email"`
+	LastName    string     `json:"lastName" dynamodbav:"LastName"`
 }
 
 type Status int
+
+/*
+status ["PLACED", "shipped","delivered"]
+*/
+
+/*
+TODO:
+model after
+https://www.youtube.com/watch?v=DIQVJqiSUkE&feature=youtu.be&t=831
+
+*/
 
 const (
 	OrderNew Status = iota + 1
@@ -27,18 +37,41 @@ const (
 	OrderDelivered
 )
 
+/*
+TODO:
+- make shipping address into a document type
+- address -----> {"StreetAddress":"123 Main St", "State": "NY", "Country":"USA"}
+
+
+*/
+
 type Order struct {
-	ID              string `json:"id"`
-	PurchaseDate    string `json:"purchaseDate"`
-	ShippingAddress string `json:"shippingAddress"`
-	Status          Status `json:"status"`
-	TotalAmount     int    `json:"totalAmount"`
-	DeliverDate     string `json:"deliverDate"`
+	OrderID         SortableID `json:"orderId" dynamodbav:"OrderId"`
+	CustomerID      SortableID `json:"customerId" dynamodbav:"CustomerId"`
+	PurchaseDate    string     `json:"purchaseDate" dynamodbav:"PurchaseDate"`
+	ShippingAddress string     `json:"shippingAddress" dynamodbav:"ShippingAddress"`
+	Status          Status     `json:"status" dynamodbav:"Status"`
+	TotalAmount     int        `json:"totalAmount" dynamodbav:"TotalAmount"`
+	DeliverDate     string     `json:"deliverDate" dynamodbav:"DeliverDate"`
 }
 
+/*
+TODO:
+- turn price into float type
+*/
+
+type OrderItem struct {
+	ItemID    SortableID `json:"orderItemId" dynamodbav:"OrderItemId"`
+	OrderID   SortableID `json:"orderId" dynamodbav:"OrderId"`
+	ProductID SortableID `json:"productId" dynamodbav:"ProductId"`
+	Price     int        `json:"price" dynamodbav:"Price"`
+	Quantity  int        `json:"quantity" dynamodbav:"Quantity"`
+}
+
+//AddUser takes a User struct and marshalls it to a ddb item on the db
 func (db *DynamoDB) AddUser(u User) (User, error) {
 
-	u.ID = uuid.New().String()
+	u.ID = NewSortableID()
 	u.CreatedDate = time.Now().Format(time.RFC3339)
 	pk := fmt.Sprintf("USER#%s", u.ID)
 	sort := "METADATA#"
@@ -69,6 +102,7 @@ func (db *DynamoDB) AddUser(u User) (User, error) {
 
 }
 
+//GetUser takes a user_id and returns a single user item with the metadata info
 func (db *DynamoDB) GetUser(id string) (User, error) {
 	//TODO: refactor with getItem request instead for speed
 	// temp comment
@@ -78,6 +112,7 @@ func (db *DynamoDB) GetUser(id string) (User, error) {
 
 	res, err := db.db.Query(&dynamodb.QueryInput{
 		TableName:              aws.String(db.tableName),
+		ScanIndexForward:       aws.Bool(false),
 		KeyConditionExpression: aws.String("#PK = :pk AND #SK = :sk"),
 		ExpressionAttributeNames: map[string]*string{
 			"#PK": aws.String("PK"),
@@ -113,7 +148,8 @@ func (db *DynamoDB) GetUser(id string) (User, error) {
 
 }
 
-func (db *DynamoDB) AddNewOrderToUser(uid string, order Order) (Order, error) {
+//AddNewOrderToUser takes a user_id and attempts to put a new item withe the User's Order
+func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error) {
 	/*
 		TODO: gotta think about below some more
 		PK=USER#<id> ; SK=ORDER<id>
@@ -121,24 +157,56 @@ func (db *DynamoDB) AddNewOrderToUser(uid string, order Order) (Order, error) {
 		GS12PK=EMAIL#<id> ; GSI2SK=ORDER<id>
 
 	*/
-	order.ID = uuid.New().String()
+	order.OrderID = NewSortableID()
 	order.PurchaseDate = time.Now().Format(time.RFC3339)
 
-	pk := fmt.Sprintf("USER#%s", uid)
-	sort := fmt.Sprintf("ORDER#%s", order.ID)
+	pk := fmt.Sprintf("USER#%s", id)
+	sort := fmt.Sprintf("ORDER#%s", order.OrderID)
+
+	//using an inverted index but with the new GSI1 attrs
+	gs1pk := sort
+	gs1sk := pk
 
 	item, err := dynamodbattribute.MarshalMap(&order)
 	if err != nil {
 		return Order{}, err
 	}
-	item["Type"] = &dynamodb.AttributeValue{S: aws.String("user_order")}
+	item["Type"] = &dynamodb.AttributeValue{S: aws.String("UserOrder")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
+	item["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
+	item["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
+
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(db.tableName),
 		Item:      item,
 	})
 
 	return order, err
+
+}
+
+func (db *DynamoDB) AddNewOrderItem(item OrderItem) error {
+	pk := fmt.Sprintf("ITEM#%s", item.ItemID)
+	sort := fmt.Sprintf("ORDER#%s", item.OrderID)
+	//using an inverted index but with the new GSI1 attrs
+	gs1pk := sort
+	gs1sk := pk
+
+	i, err := dynamodbattribute.MarshalMap(&item)
+	if err != nil {
+		return err
+	}
+	i["Type"] = &dynamodb.AttributeValue{S: aws.String("OrderItem")}
+	i["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
+	i["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
+	i["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
+	i["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
+	_, err = db.db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(db.tableName),
+		Item:      i,
+	})
+
+	return err
 
 }
