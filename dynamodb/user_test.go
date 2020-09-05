@@ -39,11 +39,7 @@ func TestAddNewOrderToUser(t *testing.T) {
 		LastName:  "Doe",
 		Email:     "johnDoe@gmail.com",
 	}
-	order := Order{
-		ShippingAddress: "123 Main Street NY, NY 12345",
-		Status:          OrderNew,
-		TotalAmount:     5000,
-	}
+
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)
 	// defer tdb.Close()
@@ -51,11 +47,21 @@ func TestAddNewOrderToUser(t *testing.T) {
 	u, err := tdb.AddUser(user)
 	t.Log(u)
 	is.NoErr(err)
+	order := Order{
+		UserID:          u.ID,
+		ShippingAddress: "123 Main Street NY, NY 12345",
+		// Status:          OrderNew,
+		TotalAmount: 5000,
+	}
 	_, err = tdb.AddNewOrderToUser(u.ID, order)
 	is.NoErr(err)
 
 }
 
 // func TestAddUserAlreadyExists(t *testing.T) {
+
+// }
+
+// func TestAddNewOrderItemToUser(t *testing.T) {
 
 // }
