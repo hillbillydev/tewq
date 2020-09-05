@@ -21,14 +21,7 @@ type User struct {
 type Status int
 
 /*
-status ["PLACED", "shipped","delivered"]
-*/
-
-/*
-TODO:
-model after
-https://www.youtube.com/watch?v=DIQVJqiSUkE&feature=youtu.be&t=831
-
+status ["PLACED", "SHIPPED","DELIVERED", "RETURNED"]
 */
 
 const (
@@ -47,12 +40,13 @@ TODO:
 
 type Order struct {
 	OrderID         SortableID `json:"orderId" dynamodbav:"OrderId"`
-	CustomerID      SortableID `json:"customerId" dynamodbav:"CustomerId"`
+	UserID          SortableID `json:"userId" dynamodbav:"UserId"`
 	PurchaseDate    string     `json:"purchaseDate" dynamodbav:"PurchaseDate"`
 	ShippingAddress string     `json:"shippingAddress" dynamodbav:"ShippingAddress"`
-	Status          Status     `json:"status" dynamodbav:"Status"`
-	TotalAmount     int        `json:"totalAmount" dynamodbav:"TotalAmount"`
-	DeliverDate     string     `json:"deliverDate" dynamodbav:"DeliverDate"`
+	Status          string     `json:"status" dynamodbav:"Status"`
+	// Status          Status     `json:"status" dynamodbav:"Status"`
+	TotalAmount int    `json:"totalAmount" dynamodbav:"TotalAmount"`
+	DeliverDate string `json:"deliverDate" dynamodbav:"DeliverDate"`
 }
 
 /*
@@ -80,7 +74,7 @@ func (db *DynamoDB) AddUser(u User) (User, error) {
 		return User{}, err
 	}
 
-	item["type"] = &dynamodb.AttributeValue{S: aws.String("person")}
+	item["Type"] = &dynamodb.AttributeValue{S: aws.String("person")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
 
@@ -103,9 +97,9 @@ func (db *DynamoDB) AddUser(u User) (User, error) {
 }
 
 //GetUser takes a user_id and returns a single user item with the metadata info
-func (db *DynamoDB) GetUser(id string) (User, error) {
+func (db *DynamoDB) GetUser(id SortableID) (User, error) {
 	//TODO: refactor with getItem request instead for speed
-	// temp comment
+
 	var result User
 	pk := fmt.Sprintf("USER#%s", id)
 	sort := "METADATA#"
@@ -153,12 +147,13 @@ func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error)
 	/*
 		TODO: gotta think about below some more
 		PK=USER#<id> ; SK=ORDER<id>
-		GSI1PK=ORDER<id> ; GSISK=STATUS#<status>
+		GSI1PK=ORDER<id> ; GSISK=USER#<id>
 		GS12PK=EMAIL#<id> ; GSI2SK=ORDER<id>
 
 	*/
 	order.OrderID = NewSortableID()
 	order.PurchaseDate = time.Now().Format(time.RFC3339)
+	order.Status = "PLACED"
 
 	pk := fmt.Sprintf("USER#%s", id)
 	sort := fmt.Sprintf("ORDER#%s", order.OrderID)
@@ -186,6 +181,14 @@ func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error)
 
 }
 
+func (db *DynamoDB) GetUserOrdersByUser() {
+
+}
+
+// func (db *DynamoDB) GetUserOrder(id SortableID) (Order, error) {
+
+// }
+
 func (db *DynamoDB) AddNewOrderItem(item OrderItem) error {
 	pk := fmt.Sprintf("ITEM#%s", item.ItemID)
 	sort := fmt.Sprintf("ORDER#%s", item.OrderID)
@@ -210,3 +213,7 @@ func (db *DynamoDB) AddNewOrderItem(item OrderItem) error {
 	return err
 
 }
+
+// func (db *DynamoDB) GetUserOrderItem(id SortableID) (Order, error) {
+
+// }
