@@ -19,7 +19,7 @@ import (
 // For example, a product can have many different colors, sizes etc etc.
 type Option struct {
 	ID             SortableID `json:"id" dynamodbav:"Id,omitempty"`
-	CreatedDate    string     `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	CreatedDate    time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
 	Size           string     `json:"size" dynamodbav:"Size,omitempty"`     // TODO enum?
 	Socket         string     `json:"socket" dynamodbav:"Socket,omitempty"` // TODO enum?
 	Color          string     `json:"color" dynamodbav:"Color,omitempty"`   // TODO enum?
@@ -30,7 +30,7 @@ type Option struct {
 // Product represents the product that customers buys.
 type Product struct {
 	ID          SortableID `json:"id" dynamodbav:"Id,omitempty"`
-	CreatedDate string     `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	CreatedDate time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
 	Category    string     `json:"category" dynamodbav:"Category,omitempty"`
 	Name        string     `json:"name" dynamodbav:"Name,omitempty"`
 	Description string     `json:"description" dynamodbav:"Description,omitempty"`
@@ -93,7 +93,7 @@ func New(endpoint, tableName string) (*DynamoDB, error) {
 // AddProduct take a Product p and attempts to put that item into DynamoDB.
 func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 
-	p.CreatedDate = time.Now().Format(time.RFC3339)
+	p.CreatedDate = time.Now()
 	p.ID = NewSortableID()
 
 	pk := fmt.Sprintf("PRODUCT#%s", p.ID)
@@ -123,7 +123,7 @@ func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 // AddOptionToProduct adds a single option to a product.
 func (db *DynamoDB) AddOptionToProduct(id SortableID, option Option) (Option, error) {
 	option.ID = NewSortableID()
-	option.CreatedDate = time.Now().Format(time.RFC3339)
+	option.CreatedDate = time.Now()
 
 	pk := fmt.Sprintf("PRODUCT#%s", id)
 	sort := fmt.Sprintf("OPTION#%s", option.ID)
