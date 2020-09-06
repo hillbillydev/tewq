@@ -32,7 +32,7 @@ func TestGetUser(t *testing.T) {
 
 }
 
-func TestAddNewOrderToUser(t *testing.T) {
+func TestAddNewOrdersToUser(t *testing.T) {
 	is := is.New(t)
 	user := User{
 		FirstName: "John",
@@ -47,14 +47,31 @@ func TestAddNewOrderToUser(t *testing.T) {
 	u, err := tdb.AddUser(user)
 	t.Log(u)
 	is.NoErr(err)
-	order := Order{
-		UserID:          u.ID,
-		ShippingAddress: "123 Main Street NY, NY 12345",
-		// Status:          OrderNew,
-		TotalAmount: 5000,
+	// order := Order{
+	// 	UserID:          u.ID,
+	// 	ShippingAddress: "123 Main Street NY, NY 12345",
+	// 	// Status:          OrderNew,
+	// 	TotalAmount: 5000,
+	// }
+	orders := []Order{
+		{
+			UserID:          u.ID,
+			ShippingAddress: "123 Main Street NY, NY 12345",
+			TotalAmount:     5000,
+		},
+		{
+			UserID:          u.ID,
+			ShippingAddress: "123 Main Street NY, NY 12345",
+			TotalAmount:     6700,
+		},
 	}
-	_, err = tdb.AddNewOrderToUser(u.ID, order)
-	is.NoErr(err)
+	for _, op := range orders {
+		_, err := tdb.AddNewOrderToUser(u.ID, op)
+		is.NoErr(err)
+	}
+
+	// _, err = tdb.AddNewOrderToUser(u.ID, order)
+	// is.NoErr(err)
 
 }
 
