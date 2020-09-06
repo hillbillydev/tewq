@@ -4,15 +4,42 @@ Me trying to apply what I have learned from [this book](https://www.dynamodbbook
 
 ## DynamoDB Access Patterns
 
-|  Access Patterns                                | By                     | Table/Index  | Key Condition                         | Filter Condition                                          |
-| :---------------------------------------------: | :---------------       | :----------: | :-----------------------------------: | :-------------------------------------------------------: |
-|  Get Users Orders                               |                        |              |                                       |                                                           |
-|                                                 | by date and email      | Table        | GSIPK = emails                        | duartion > 0                                              |
-|  Get Basket                                     |                        |              |                                       |                                                           |
-|                                                 | by date and email      | Table        | GSIPK = emails                        | duartion > 0                                              |
-|  Get Item                                       |                        |              |                                       |                                                           |
-|                                                 | by id                  | Table        | PK = emails                           | duartion > 0                                              |
-|                                                 | by category and price  | GSI1PK       | GSIPK = category, GI1SK price > 0     | stock > 0                                                 |
+| Access Pattern                     | Index      | Parameters                | Notes |
+|:-----------------------------------|:-----------|:--------------------------|:------|
+| Get Baskets Products               | Main Table | * CustomerID              | TODO  |
+| Get Products by Category           | GSI1       | * Category <br /> * Price | TODO  |
+| Get Products by Category and Price | GSI1       | * Category                | TODO  |
+| Get Products Reviews               |            | *                         |       |
+| Get Users 10 latest Reviews        |            | *                         |       |
+| Get Users 10 latest Orders         |            | *                         |       |
+| Get Featured Products              |            | *                         |       |
+| Create Product                     |            | *                         |       |
+| Create an Option for an Product    |            | *                         |       |
+| Get a Product                      |            | *                         |       |
+| Add Product to Basket              |            | *                         |       |
+
+## Entity Chart
+
+
+### Main Table
+
+| Entity             | PK                  | SK                |
+| :----------------- | ----------------:   | ----------------: |
+| Basket             | Basket#[CustomerID] | PRODUCT#[Date]    |
+| Product            | Product#[ProductID] | METADATA#         |
+| Option             | Product#[ProductID] | OPTION#[OptionID] |
+| Review             |                     |                   |
+| Order              |                     |                   |
+| Category           | N/A                 | N/A               |
+| OrderDetails       |                     |                   |
+
+
+### GSI1
+
+| Entity             | GSI1K                       | GSI2K    |
+| :----------------- | -------------------:        | -------: |
+| Product            | PRODUCT#CATEGORY#[Category] | [Price]  |
+
 
 
 ## Entity Relationship Diagram

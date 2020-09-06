@@ -230,7 +230,7 @@ func TestGetProductsByCategoryPagination(t *testing.T) {
 }
 
 func TestAddBasketItem(t *testing.T) {
-	customerId := NewSortableID()
+	customerID := NewSortableID()
 	is := is.New(t)
 	product := Product{
 		Name:     "Golf Club",
@@ -254,7 +254,7 @@ func TestAddBasketItem(t *testing.T) {
 	is.NoErr(err)
 
 	err = tdb.AddBasketItem(BasketItem{
-		CustomerID:      customerId,
+		CustomerID:      customerID,
 		ProductID:       p.ID,
 		ProductOptionID: o.ID,
 	})

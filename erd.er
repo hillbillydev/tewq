@@ -22,6 +22,7 @@ title {label: "Tewq Entity Relationship Diagram", size: "20"}
 [category]
 
 [product]
+[featured_product]
 
 [option]
 
@@ -39,5 +40,6 @@ product 1--* order_details
 product 1--1 category
 product 1--* option
 product 1--* review
+product 1--1 featured_product { label: "Can be featured" }
 
 basket *--* product

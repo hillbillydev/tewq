@@ -15,6 +15,8 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// Option represents an option for an Product.
+// For example, a product can have many different colors, sizes etc etc.
 type Option struct {
 	ID             SortableID `json:"id" dynamodbav:"Id,omitempty"`
 	CreatedDate    time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
@@ -25,6 +27,7 @@ type Option struct {
 	ShaftStiffness float64    `json:"shaftStiffness" dynamodbav:"ShaftStiffness,omitempty"`
 }
 
+// Product represents the product that customers buys.
 type Product struct {
 	ID          SortableID `json:"id" dynamodbav:"Id,omitempty"`
 	CreatedDate time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
@@ -39,21 +42,27 @@ type Product struct {
 	Options     []Option   `json:"options" dynamodbav:"-"`
 }
 
+// Basket contains the Products an customer wants to buy in the future.
 type Basket struct {
 	Products []Product `json:"products"`
 }
 
+// BasketItem contains the pointers to which customer
+// wants which product within the basket.
 type BasketItem struct {
 	CustomerID      SortableID `json:"customerId" dynamodbav:"CustomerId"`
 	ProductID       SortableID `json:"productId" dynamodbav:"ProductId"`
 	ProductOptionID SortableID `json:"productOptionId" dynamodbav:"ProductOptionId"`
 }
 
+// DynamoDB wraps AWS dynamodb.DynamoDB
+// This is to add domain logic.
 type DynamoDB struct {
 	db        *dynamodb.DynamoDB
 	tableName string
 }
 
+// New creates a DynamoDB wrapper.
 func New(endpoint, tableName string) (*DynamoDB, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
@@ -244,6 +253,7 @@ func (db *DynamoDB) GetProductsByCategory(input *GetProductsByCategoryInput) ([]
 	return result, lastKey, err
 }
 
+// AddBasketItem adds an BasketItem
 func (db *DynamoDB) AddBasketItem(item BasketItem) error {
 	pk := fmt.Sprintf("BASKET#%s", item.CustomerID)
 	sort := fmt.Sprintf("PRODUCT#%s", time.Now().Format(time.RFC3339))
@@ -264,6 +274,7 @@ func (db *DynamoDB) AddBasketItem(item BasketItem) error {
 	return err
 }
 
+// SortableID makes the ID sortable.
 type SortableID ksuid.KSUID
 
 // NewSortableID creates a new sortable id.
@@ -272,12 +283,16 @@ func NewSortableID() SortableID { return SortableID(ksuid.New()) }
 // String satisfies the Stringer interface.
 func (id SortableID) String() string { return ksuid.KSUID(id).String() }
 
+// MarshalDynamoDBAttributeValue satisfy the dynamodbattribute.Marshaler interface.
+// By doing that I can tell DynamoDB how to handle my SortableID.
 func (id *SortableID) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
 	v := fmt.Sprintf("%s", id)
 	av.S = &v
 	return nil
 }
 
+// UnmarshalDynamoDBAttributeValue satisfy the dynamodbattribute.Unmarshaler interface.
+// By doing that I can tell DynamoDB how to handle my SortableID.
 func (id *SortableID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
 	if av.S == nil {
 		return nil
