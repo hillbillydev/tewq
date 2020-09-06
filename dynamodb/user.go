@@ -11,24 +11,21 @@ import (
 )
 
 type User struct {
-	ID          SortableID `json:"id" dynamodbav:"Id"`
-	CreatedDate string     `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
-	Email       string     `json:"email" dynamodbav:"Email"`
-	FirstName   string     `json:"firstName" dynamodbav:"Email"`
-	LastName    string     `json:"lastName" dynamodbav:"LastName"`
+	ID SortableID `json:"id" dynamodbav:"Id"`
+	//TODO: username?
+	CreatedDate string `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	Email       string `json:"email" dynamodbav:"Email"`
+	FirstName   string `json:"firstName" dynamodbav:"Email"`
+	LastName    string `json:"lastName" dynamodbav:"LastName"`
 }
 
-type Status int
+// type Status int
 
-/*
-status ["PLACED", "SHIPPED","DELIVERED", "RETURNED"]
-*/
-
-const (
-	OrderNew Status = iota + 1
-	OrderShipped
-	OrderDelivered
-)
+// const (
+// 	OrderNew Status = iota + 1
+// 	OrderShipped
+// 	OrderDelivered
+// )
 
 /*
 TODO:
@@ -37,11 +34,18 @@ TODO:
 
 
 */
+//Order status options
+const (
+	StatusNewOrder       = "PLACED"
+	StatusShippedOrder   = "SHIPPED"
+	StatusDeliveredOrder = "DELIVERED"
+)
 
 type Order struct {
 	OrderID         SortableID `json:"orderId" dynamodbav:"OrderId"`
 	UserID          SortableID `json:"userId" dynamodbav:"UserId"`
-	PurchaseDate    string     `json:"purchaseDate" dynamodbav:"PurchaseDate"`
+	PurchasedDate   string     `json:"purchasedDate" dynamodbav:"PurchasedDate"`
+	ModifiedDate    string     `json:"modifiedDate" dynamodbav:"ModifiedDate"`
 	ShippingAddress string     `json:"shippingAddress" dynamodbav:"ShippingAddress"`
 	Status          string     `json:"status" dynamodbav:"Status"`
 	// Status          Status     `json:"status" dynamodbav:"Status"`
@@ -60,6 +64,16 @@ type OrderItem struct {
 	ProductID SortableID `json:"productId" dynamodbav:"ProductId"`
 	Price     int        `json:"price" dynamodbav:"Price"`
 	Quantity  int        `json:"quantity" dynamodbav:"Quantity"`
+}
+
+func validStatus(status string) bool {
+	items := []string{StatusNewOrder, StatusShippedOrder, StatusDeliveredOrder}
+	for _, item := range items {
+		if item == status {
+			return true
+		}
+	}
+	return false
 }
 
 //AddUser takes a User struct and marshalls it to a ddb item on the db
@@ -145,23 +159,31 @@ func (db *DynamoDB) GetUser(id SortableID) (User, error) {
 
 //AddNewOrderToUser takes a user_id and attempts to put a new item withe the User's Order
 func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error) {
-	/*
-		TODO: gotta think about below some more
-		PK=USER#<id> ; SK=ORDER<id>
-		GSI1PK=ORDER<id> ; GSISK=USER#<id>
-		GS12PK=EMAIL#<id> ; GSI2SK=ORDER<id>
 
-	*/
 	order.OrderID = NewSortableID()
-	order.PurchaseDate = time.Now().Format(time.RFC3339)
-	order.Status = "PLACED"
+	order.PurchasedDate = time.Now().Format(time.RFC3339)
+	order.ModifiedDate = order.PurchasedDate
+	order.Status = StatusNewOrder
 
 	pk := fmt.Sprintf("USER#%s", id)
 	sort := fmt.Sprintf("ORDER#%s", order.OrderID)
 
 	//using an inverted index but with the new GSI1 attrs
+	// For this GSI:
+	// if we query GSI1PK=ORDER#<id> AND begins_with(GSI1SK,"USER#") we'll get the
+	// user that the order belongs to
 	gs1pk := sort
 	gs1sk := pk
+
+	//setting GSI2 attrs
+	//below
+	//NOTE: since we'd need to update the status at least 2 more times
+	// this may not be most optimal from a WCU pov,
+	//using a composite sort key of OrderStatus & MODIFIEDDATE
+	//GS2PK=USER#<id> GSI2SK=<STATUS>#<MODIFIEDDATE>
+
+	gs2pk := pk
+	gs2sk := fmt.Sprintf("%s#%s", order.Status, order.PurchasedDate)
 
 	item, err := dynamodbattribute.MarshalMap(&order)
 	if err != nil {
@@ -172,7 +194,8 @@ func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error)
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
 	item["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
 	item["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
-
+	item["GSI2PK"] = &dynamodb.AttributeValue{S: aws.String(gs2pk)}
+	item["GSI2SK"] = &dynamodb.AttributeValue{S: aws.String(gs2sk)}
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(db.tableName),
 		Item:      item,
@@ -182,9 +205,58 @@ func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error)
 
 }
 
-func (db *DynamoDB) GetUserOrdersByUser() {
+func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, status string) error {
 
+	modifiedDate := time.Now().Format(time.RFC3339)
+
+	if !validStatus(status) {
+		return errors.New("invalid status value; check your input parameter")
+	}
+
+	pk := fmt.Sprintf("USER#%s", uid)
+	sort := fmt.Sprintf("ORDER#%s", oid)
+
+	// ConditionExpression: aws.String(checkCond)
+	_, err := db.db.UpdateItem(&dynamodb.UpdateItemInput{
+		TableName: aws.String(db.tableName),
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String(pk),
+			},
+			"SK": {
+				S: aws.String(sort),
+			},
+		},
+		ReturnValues:     aws.String("UPDATED_NEW"),
+		UpdateExpression: aws.String("SET #ModifiedDate = :m, #Status = :s, #GSI2SK = :gsi2sk"),
+		ExpressionAttributeNames: map[string]*string{
+			"#ModifiedDate": aws.String("ModifiedDate"),
+			"#Status":       aws.String("Status"),
+			"#GSI2SK":       aws.String("GSI2SK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":m": {
+				S: aws.String(modifiedDate),
+			},
+			":s": {
+				S: aws.String(status),
+			},
+			":gsi2sk": {
+				S: aws.String(fmt.Sprintf("%s#%s", status, modifiedDate)),
+			},
+		},
+	})
+
+	return err
 }
+
+//:many
+
+// func (db *DynamoDB) GetUserOrdersByUser() {
+// var result []Order
+// 	return
+
+// }
 
 // func (db *DynamoDB) GetUserOrder(id SortableID) (Order, error) {
 
