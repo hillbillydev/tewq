@@ -1,8 +1,11 @@
 package dynamodb
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -159,16 +162,43 @@ func (db *DynamoDB) GetProduct(id SortableID) (Product, error) {
 	return result, err
 }
 
-func (db *DynamoDB) GetProductsByCategoryAndPrice(category string, from, to int) ([]Product, error) {
-	return db.getProductsByCategoryAndPrice(category, from, to)
+type GetProductsByCategoryInput struct {
+	Category        string // required
+	FromPrice       int
+	ToPrice         int
+	PaginationLimit int
+	PreviousKey     ProductCategoryPaginationKey
 }
 
-func (db *DynamoDB) GetProductsByCategory(category string) ([]Product, error) {
-	return db.getProductsByCategoryAndPrice(category, 0, math.MaxInt64)
+func (in *GetProductsByCategoryInput) validate() error {
+	// TODO use enums here .
+	if in.Category == "" {
+		return errors.New("Expected Category to have a value.")
+	}
+
+	if in.ToPrice < in.FromPrice {
+		return fmt.Errorf("PriceRange.To (%d) is smaller then PriceRange.From (%d).", in.ToPrice, in.FromPrice)
+	}
+
+	if in.ToPrice == 0 {
+		in.ToPrice = math.MaxInt64
+	}
+
+	if in.PaginationLimit == 0 {
+		in.PaginationLimit = 20
+	}
+
+	return nil
 }
 
-func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int) ([]Product, error) {
+// GetProductsByCategory fetches all products with a specific Category and price range.
+func (db *DynamoDB) GetProductsByCategory(input *GetProductsByCategoryInput) ([]Product, ProductCategoryPaginationKey, error) {
+	if err := input.validate(); err != nil {
+		return nil, "", err
+	}
+
 	var result []Product
+	var lastKey ProductCategoryPaginationKey
 
 	res, err := db.db.Query(&dynamodb.QueryInput{
 		TableName:              aws.String(db.tableName),
@@ -180,30 +210,37 @@ func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int)
 		},
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":gsi1pk": {
-				S: aws.String(fmt.Sprintf("PRODUCT#CATEGORY#%s", category)),
+				S: aws.String(fmt.Sprintf("PRODUCT#CATEGORY#%s", input.Category)),
 			},
 			":from": {
-				S: aws.String(zerosPricePadding(from)),
+				S: aws.String(zerosPricePadding(input.FromPrice)),
 			},
 			":to": {
-				S: aws.String(fmt.Sprintf(zerosPricePadding(to))),
+				S: aws.String(zerosPricePadding(input.ToPrice)),
 			},
 		},
+		Limit:             aws.Int64(int64(input.PaginationLimit)),
+		ExclusiveStartKey: decodePaginationKey(input.PreviousKey),
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if len(res.Items) == 0 {
 		// TODO error not found here?
-		return nil, nil
+		return nil, "", nil
+	}
+
+	err = dynamodbattribute.UnmarshalMap(res.LastEvaluatedKey, &lastKey)
+	if err != nil {
+		return nil, "", err
 	}
 
 	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return result, err
+	return result, lastKey, err
 }
 
 func (db *DynamoDB) AddBasketItem(item BasketItem) error {
@@ -230,8 +267,9 @@ type SortableID ksuid.KSUID
 
 // NewSortableID creates a new sortable id.
 func NewSortableID() SortableID { return SortableID(ksuid.New()) }
+
 // String satisfies the Stringer interface.
-func (id SortableID) String() string    { return ksuid.KSUID(id).String() }
+func (id SortableID) String() string { return ksuid.KSUID(id).String() }
 
 func (id *SortableID) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
 	v := fmt.Sprintf("%s", id)
@@ -251,6 +289,54 @@ func (id *SortableID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValu
 	*id = SortableID(v)
 
 	return nil
+}
+
+type ProductCategoryPaginationKey string
+
+func (k *ProductCategoryPaginationKey) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
+	if av.M == nil {
+		return nil
+	}
+	key := fmt.Sprintf("%s_%s_%s_%s", *av.M["PK"].S, *av.M["SK"].S, *av.M["GSI1PK"].S, *av.M["GSI1SK"].S)
+	key = base64.StdEncoding.EncodeToString([]byte(key))
+
+	*k = ProductCategoryPaginationKey(key)
+
+	return nil
+}
+
+func decodePaginationKey(pkey ProductCategoryPaginationKey) map[string]*dynamodb.AttributeValue {
+	if pkey == "" {
+		return nil
+	}
+	key, err := base64.StdEncoding.DecodeString(string(pkey))
+	if err != nil {
+		// TODO return error here instead?
+		return nil
+	}
+	s := strings.Split(string(key), "_")
+	if len(s) != 4 {
+		// TODO error
+		return nil
+	}
+
+	pk, sk, gsi, gsisk := s[0], s[1], s[2], s[3]
+
+	return map[string]*dynamodb.AttributeValue{
+		"PK": {
+			S: aws.String(pk),
+		},
+		"SK": {
+			S: aws.String(sk),
+		},
+		"GSI1PK": {
+			S: aws.String(gsi),
+		},
+		"GSI1SK": {
+			S: aws.String(gsisk),
+		},
+	}
+
 }
 
 func zerosPricePadding(i int) string {

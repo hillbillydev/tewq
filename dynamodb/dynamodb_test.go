@@ -145,7 +145,9 @@ func TestGetProductsByCategory(t *testing.T) {
 		is.NoErr(err)
 	}
 
-	fetched, err := tdb.GetProductsByCategory(categoryToFetch)
+	fetched, _, err := tdb.GetProductsByCategory(&GetProductsByCategoryInput{
+		Category: categoryToFetch,
+	})
 	is.NoErr(err)
 
 	is.True(len(fetched) == 2) // should be 2 products with category "Clubs"
@@ -182,10 +184,49 @@ func TestGetProductsByCategoryAndPrice(t *testing.T) {
 		is.NoErr(err)
 	}
 
-	fetched, err := tdb.GetProductsByCategoryAndPrice(categoryToFetch, 500, 600)
+	fetched, _, err := tdb.GetProductsByCategory(&GetProductsByCategoryInput{
+		Category: categoryToFetch,
+		FromPrice: 500,
+		ToPrice: 600,
+	})
 	is.NoErr(err)
 	is.True(len(fetched) == 1) // should be 1 products with category "Clubs"
 	is.Equal(fetched[0].Price, products[2].Price)
+}
+
+func TestGetProductsByCategoryPagination(t *testing.T) {
+	is := is.New(t)
+	categoryToFetch := "Clubs"
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	defer tdb.Close()
+
+	// Prepare data to get fetched
+	for i := 9; i != 0; i-- {
+		// Add 9 golf clubs to the database.
+		_, err := tdb.AddProduct(Product{
+			Name:     fmt.Sprintf("Test%d", i),
+			Category: categoryToFetch,
+		})
+		is.NoErr(err)
+	}
+
+	fetched, last, err := tdb.GetProductsByCategory(&GetProductsByCategoryInput{
+		Category: categoryToFetch,
+		PaginationLimit: 5,
+	})
+	is.NoErr(err)
+	is.True(len(fetched) == 5)
+	is.True(last != "")
+
+	fetched, last, err = tdb.GetProductsByCategory(&GetProductsByCategoryInput{
+		Category: categoryToFetch,
+		PreviousKey: last,
+	})
+	is.NoErr(err)
+	is.True(len(fetched) == 4)
+	is.True(last == "")
 }
 
 func TestAddBasketItem(t *testing.T) {
