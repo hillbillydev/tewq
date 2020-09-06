@@ -163,7 +163,7 @@ func TestGetProductsByCategoryAndPrice(t *testing.T) {
 		{
 			Name:     "Golf Club",
 			Category: categoryToFetch,
-			Price:    1000,
+			Price:    100,
 		},
 		{
 			Name:     "Golf Club 2",
@@ -204,7 +204,7 @@ func TestAddBasketItem(t *testing.T) {
 
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)
-	//defer tdb.Close()
+	defer tdb.Close()
 
 	// Prepare data to get fetched
 	p, err := tdb.AddProduct(product)

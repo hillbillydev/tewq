@@ -3,7 +3,6 @@ package dynamodb
 import (
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -75,7 +74,7 @@ func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 	pk := fmt.Sprintf("PRODUCT#%s", p.ID)
 	sort := "METADATA#"
 	gs1pk := fmt.Sprintf("PRODUCT#CATEGORY#%s", p.Category)
-	gs1sk := strconv.Itoa(p.Price)
+	gs1sk := zerosPricePadding(p.Price)
 
 	item, err := dynamodbattribute.MarshalMap(&p)
 	if err != nil {
@@ -184,10 +183,10 @@ func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int)
 				S: aws.String(fmt.Sprintf("PRODUCT#CATEGORY#%s", category)),
 			},
 			":from": {
-				S: aws.String(strconv.Itoa(from)),
+				S: aws.String(zerosPricePadding(from)),
 			},
 			":to": {
-				S: aws.String(strconv.Itoa(to)),
+				S: aws.String(fmt.Sprintf(zerosPricePadding(to))),
 			},
 		},
 	})
@@ -252,4 +251,8 @@ func (id *SortableID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValu
 	*id = SortableID(v)
 
 	return nil
+}
+
+func zerosPricePadding(i int) string {
+	return fmt.Sprintf("%015d", i)
 }
