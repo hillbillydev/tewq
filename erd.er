@@ -13,62 +13,31 @@ title {label: "Tewq Entity Relationship Diagram", size: "20"}
 # yellow #fbfbdb
 # orange #eee0a0
 
-[person] {bgcolor: "#d0e0d0"}
-  *person_id {label: "person_id, not null"}
-  first_name {label: "varchar, not null"}
-  last_name {label: "varchar, not null"}
+[customer]
 
 [order]
-  *order_id {label: "varchar, not null"}
-  *+customer_id {label: "customer_id, not null"}
-  amount {label: "int, not null"}
-  shipping_adress {label: "varchar, not null"}
-  order_date {label: "utcdate, not null"}
-  status {label: "status, not null"}
-  delivered {label: "utcdate, not null"}
 
 [order_details]
-  *order_details_id {label: "varchar, not null"}
-  *+product_id {label: "varchar, not null"}
-  *+order_id {label: "varchar, not null"}
-  price {label: "varchar, not null"}
-  quantity {label: "varchar, not null"}
 
 [category]
-  *category_id {label: "varchar, not null"}
-  name {label: "varchar, not null"}
-  description {label: "varchar, not null"}
 
 [product]
-  *product_id {label: "varchar, not null"}
-  name { label: "varchar, not null"}
-  price { label: "int, not null"}
-  sale { label: "int, not null"}
-  weight { label: "int, not null"}
-  image { label: "varchar, not null"}
-  thumbnail { label: "varchar, not null"}
-  create_date { label: "varchar, not null"}
-  description {label: "varchar, not null"}
 
 [option]
-  *option_id {label: "varchar, not null"}
-  color { label: "color, null"}
-  size { label: "size, null"}
-  socket { label: "socket, null"}
-  shaft_stiffness { label: "float, null"}
-  stock { label: "int, not null"}
-
 
 [basket]
-  *basket_id {label: "varchar, not null"}
 
-person 1--1 basket
-person 1--* order
+[review]
+
+customer 1--1 basket
+customer 1--* order
+customer 1--* review
 
 order 1--* order_details
 
 product 1--* order_details
 product 1--1 category
 product 1--* option
+product 1--* review
 
-basket 1--* product
+basket *--* product
