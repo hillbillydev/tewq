@@ -258,7 +258,7 @@ func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
 	res, err := db.db.Query(&dynamodb.QueryInput{
 		TableName:              aws.String(db.tableName),
 		IndexName:              aws.String("GSI1"),
-		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk And begins_with(#GSI1SK, :gsi1sk"),
+		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk And begins_with(#GSI1SK, :gsi1sk)"),
 		ExpressionAttributeNames: map[string]*string{
 			"#GSI1PK": aws.String("GSI1PK"),
 			"#GSI1SK": aws.String("GSI1SK"),
