@@ -32,7 +32,7 @@ func TestGetUser(t *testing.T) {
 
 }
 
-func TestAddNewOrdersToUser(t *testing.T) {
+func TestAddNewOrdersToUserAndGetOrdersByID(t *testing.T) {
 	is := is.New(t)
 	user := User{
 		FirstName: "John",
@@ -47,12 +47,7 @@ func TestAddNewOrdersToUser(t *testing.T) {
 	u, err := tdb.AddUser(user)
 	t.Log(u)
 	is.NoErr(err)
-	// order := Order{
-	// 	UserID:          u.ID,
-	// 	ShippingAddress: "123 Main Street NY, NY 12345",
-	// 	// Status:          OrderNew,
-	// 	TotalAmount: 5000,
-	// }
+
 	orders := []Order{
 		{
 			UserID:          u.ID,
@@ -65,13 +60,23 @@ func TestAddNewOrdersToUser(t *testing.T) {
 			TotalAmount:     6700,
 		},
 	}
+	orderIDs := []SortableID{}
 	for _, op := range orders {
-		_, err := tdb.AddNewOrderToUser(u.ID, op)
+		order, err := tdb.AddNewOrderToUser(u.ID, op)
 		is.NoErr(err)
+		orderIDs = append(orderIDs, order.OrderID)
 	}
+	for _, oid := range orderIDs {
+		fetchedOrder, err := tdb.GetUserOrderByOrderID(oid)
+		is.NoErr(err)
+		is.Equal(fetchedOrder.OrderID, oid)
 
-	// _, err = tdb.AddNewOrderToUser(u.ID, order)
-	// is.NoErr(err)
+	}
+	// fetched, err := tdb.GetU
+
+}
+
+func TestUpdateUserOrderStatus(t *testing.T) {
 
 }
 
