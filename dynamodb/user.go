@@ -11,7 +11,7 @@ import (
 )
 
 type User struct {
-	ID SortableID `json:"id" dynamodbav:"Id"`
+	ID SortableID `json:"userId" dynamodbav:"UserId"`
 	//TODO: username?
 	CreatedDate string `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
 	Email       string `json:"email" dynamodbav:"Email"`
@@ -19,13 +19,11 @@ type User struct {
 	LastName    string `json:"lastName" dynamodbav:"LastName"`
 }
 
-// type Status int
+/*
+TODO: read over DDB errors
+https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html
 
-// const (
-// 	OrderNew Status = iota + 1
-// 	OrderShipped
-// 	OrderDelivered
-// )
+*/
 
 /*
 TODO:
@@ -48,15 +46,9 @@ type Order struct {
 	ModifiedDate    string     `json:"modifiedDate" dynamodbav:"ModifiedDate"`
 	ShippingAddress string     `json:"shippingAddress" dynamodbav:"ShippingAddress"`
 	Status          string     `json:"status" dynamodbav:"Status"`
-	// Status          Status     `json:"status" dynamodbav:"Status"`
-	TotalAmount int    `json:"totalAmount" dynamodbav:"TotalAmount"`
-	DeliverDate string `json:"deliverDate" dynamodbav:"DeliverDate"`
+	TotalAmount     int        `json:"totalAmount" dynamodbav:"TotalAmount"`
+	DeliverDate     string     `json:"deliverDate" dynamodbav:"DeliverDate"`
 }
-
-/*
-TODO:
-- turn price into float type
-*/
 
 type OrderItem struct {
 	ItemID    SortableID `json:"orderItemId" dynamodbav:"OrderItemId"`
@@ -134,7 +126,8 @@ func (db *DynamoDB) GetUser(id SortableID) (User, error) {
 			":sk": {
 				S: aws.String(sort),
 			},
-		}})
+		},
+	})
 
 	if err != nil {
 		return User{}, err
@@ -205,12 +198,108 @@ func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error)
 
 }
 
+//:many
+
+func (db *DynamoDB) GetUserOrdersByUserID(id SortableID) ([]Order, error) {
+	var result []Order
+	pk := fmt.Sprintf("USER#%s", id)
+	sort := "ORDER#"
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		KeyConditionExpression: aws.String("#PK = :pk AND begins_with(#SK,:sk"),
+		ExpressionAttributeNames: map[string]*string{
+			"#PK": aws.String("PK"),
+			"SK":  aws.String("SK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":pk": {
+				S: aws.String(pk),
+			},
+			":sk": {
+				S: aws.String(sort),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Items) == 0 {
+		// TODO error not found here?
+		return nil, errors.New("No user order item(s) in db with PK given")
+	}
+	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, err
+
+}
+
+/*
+TODO:
+-maybe modify with querybuilder api
+https://docs.aws.amazon.com/sdk-for-go/api/service/dynamodb/expression/#KeyBuilder.BeginsWith
+
+*/
+
+//:one
+
+/*
+TODO: (fix err below)
+user_test.go:71: err: ValidationException: Invalid KeyConditionExpression: Syntax error; token: "<EOF>", near: ":gsi1sk"
+
+*/
+
+func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
+	var result Order
+	gsi1pk := fmt.Sprintf("ORDER#%s", id)
+	gsi1sk := "USER#"
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		IndexName:              aws.String("GSI1"),
+		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk And begins_with(#GSI1SK, :gsi1sk"),
+		ExpressionAttributeNames: map[string]*string{
+			"#GSI1PK": aws.String("GSI1PK"),
+			"#GSI1SK": aws.String("GSI1SK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":gsi1pk": {
+				S: aws.String(gsi1pk),
+			},
+			":gsi1sk": {
+				S: aws.String(gsi1sk),
+			},
+		},
+	})
+	if err != nil {
+		return Order{}, err
+	}
+	if len(res.Items) == 0 {
+		// TODO error not found here?
+		return Order{}, errors.New("No user order item in db with GSI1PK given")
+	}
+	item := res.Items[0]
+
+	err = dynamodbattribute.UnmarshalMap(item, &result)
+	if err != nil {
+		return Order{}, err
+	}
+
+	return result, err
+
+}
+
+// func (db *DynamoDB) GetUserOrdersByOrderIDAndStatus(id SortableID) ([]Order, error) {
+
+// }
+
 func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, status string) error {
 
 	modifiedDate := time.Now().Format(time.RFC3339)
 
 	if !validStatus(status) {
-		return errors.New("invalid status value; check your input parameter")
+		return errors.New("invalid status value; check your status parameter")
 	}
 
 	pk := fmt.Sprintf("USER#%s", uid)
@@ -249,14 +338,6 @@ func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, status string) error {
 
 	return err
 }
-
-//:many
-
-// func (db *DynamoDB) GetUserOrdersByUser() {
-// var result []Order
-// 	return
-
-// }
 
 // func (db *DynamoDB) GetUserOrder(id SortableID) (Order, error) {
 
