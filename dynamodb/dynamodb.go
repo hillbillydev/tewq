@@ -58,6 +58,7 @@ func New(endpoint, tableName string) (*DynamoDB, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
+
 	svc := dynamodb.New(sess, &aws.Config{
 		Endpoint: aws.String(endpoint),
 	})
