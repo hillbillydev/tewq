@@ -15,7 +15,7 @@ type User struct {
 	//TODO: username?
 	CreatedDate string `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
 	Email       string `json:"email" dynamodbav:"Email"`
-	FirstName   string `json:"firstName" dynamodbav:"Email"`
+	FirstName   string `json:"firstName" dynamodbav:"FirstName"`
 	LastName    string `json:"lastName" dynamodbav:"LastName"`
 }
 
@@ -32,6 +32,7 @@ TODO:
 
 
 */
+//TODO: should these be custom string type instead of string?
 //Order status options
 const (
 	StatusNewOrder       = "PLACED"
@@ -58,15 +59,7 @@ type OrderItem struct {
 	Quantity  int        `json:"quantity" dynamodbav:"Quantity"`
 }
 
-func validStatus(status string) bool {
-	items := []string{StatusNewOrder, StatusShippedOrder, StatusDeliveredOrder}
-	for _, item := range items {
-		if item == status {
-			return true
-		}
-	}
-	return false
-}
+//TODO: check db to see if that email is in already in the db
 
 //AddUser takes a User struct and marshalls it to a ddb item on the db
 func (db *DynamoDB) AddUser(u User) (User, error) {
@@ -80,24 +73,25 @@ func (db *DynamoDB) AddUser(u User) (User, error) {
 		return User{}, err
 	}
 
-	item["Type"] = &dynamodb.AttributeValue{S: aws.String("person")}
+	item["Type"] = &dynamodb.AttributeValue{S: aws.String("Person")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
 
 	//TODO:
 	//if we update the email field; we'd need to update the GSIPK=EMAIL<email>
-	// gs1pk := fmt.Sprintf("EMAIL#%s", u.Email)
-	// gs1sk := sort
-	// item["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
-	// item["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
+	gs1pk := fmt.Sprintf("EMAIL#%s", u.Email)
+	gs1sk := sort
+	item["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
+	item["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
 
 	//TODO: checkCond deprecated since uuid is generated in local scope
 	//so we don't overwrite an existing user metadata item
-	checkCond := "attribute_not_exists(PK) AND attribute_not_exists(SK)"
+	// checkCond := "attribute_not_exists(PK) AND attribute_not_exists(SK)"
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
-		TableName:           aws.String(db.tableName),
-		Item:                item,
-		ConditionExpression: aws.String(checkCond)})
+		TableName: aws.String(db.tableName),
+		Item:      item,
+		// ConditionExpression: aws.String(checkCond)
+	})
 
 	return u, err
 
@@ -146,6 +140,45 @@ func (db *DynamoDB) GetUser(id SortableID) (User, error) {
 	// fmt.Println("kets see")
 	// log.Printf("%+v", result)
 
+	return result, nil
+
+}
+
+//:one
+
+func (db *DynamoDB) GetUserByEmail(email string) (User, error) {
+	var result User
+	gsi1pk := fmt.Sprintf("EMAIL#%s", email)
+	gsi1sk := "METADATA#"
+
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		IndexName:              aws.String("GSI1"),
+		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk And #GSI1SK = :gsi1sk "),
+		ExpressionAttributeNames: map[string]*string{
+			"#GSI1PK": aws.String("GSI1PK"),
+			"#GSI1SK": aws.String("GSI1SK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":gsi1pk": {
+				S: aws.String(gsi1pk),
+			},
+			":gsi1sk": {
+				S: aws.String(gsi1sk),
+			},
+		},
+	})
+	if err != nil {
+		return User{}, err
+	}
+	if len(res.Items) == 0 {
+		return User{}, errors.New("No user order item(s) in db with PK given")
+	}
+	item := res.Items[0]
+	err = dynamodbattribute.UnmarshalMap(item, &result)
+	if err != nil {
+		return User{}, err
+	}
 	return result, nil
 
 }
@@ -224,7 +257,6 @@ func (db *DynamoDB) GetUserOrdersByUserID(id SortableID) ([]Order, error) {
 		return nil, err
 	}
 	if len(res.Items) == 0 {
-		// TODO error not found here?
 		return nil, errors.New("No user order item(s) in db with PK given")
 	}
 	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
@@ -244,12 +276,6 @@ https://docs.aws.amazon.com/sdk-for-go/api/service/dynamodb/expression/#KeyBuild
 */
 
 //:one
-
-/*
-TODO: (fix err below)
-user_test.go:71: err: ValidationException: Invalid KeyConditionExpression: Syntax error; token: "<EOF>", near: ":gsi1sk"
-
-*/
 
 func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
 	var result Order
@@ -276,7 +302,6 @@ func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
 		return Order{}, err
 	}
 	if len(res.Items) == 0 {
-		// TODO error not found here?
 		return Order{}, errors.New("No user order item in db with GSI1PK given")
 	}
 	item := res.Items[0]
@@ -294,19 +319,48 @@ func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
 
 // }
 
-func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, status string) error {
+func validStatus(status string) bool {
+	items := []string{StatusNewOrder, StatusShippedOrder, StatusDeliveredOrder}
+	for _, item := range items {
+		if item == status {
+			return true
+		}
+	}
+	return false
+}
+
+//we'll use this in our conditionExpression when updating an order item in ddb
+/*
+order progression goes from PLACED --> SHIPPED --> DELIVERED
+logic should incorporate the use of a Conditional Update
+*/
+func getPriorStatus(newStatus string) (string, error) {
+	switch newStatus {
+	case StatusShippedOrder:
+		return StatusNewOrder, nil
+	case StatusDeliveredOrder:
+		return StatusShippedOrder, nil
+	default:
+		return "", errors.New("Order status is delivered. No need to update ddb item")
+	}
+}
+
+func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, newStatus string) error {
 
 	modifiedDate := time.Now().Format(time.RFC3339)
 
-	if !validStatus(status) {
+	if !validStatus(newStatus) {
 		return errors.New("invalid status value; check your status parameter")
+	}
+	oldStatus, err := getPriorStatus(newStatus)
+	if err != nil {
+		return err
 	}
 
 	pk := fmt.Sprintf("USER#%s", uid)
 	sort := fmt.Sprintf("ORDER#%s", oid)
 
-	// ConditionExpression: aws.String(checkCond)
-	_, err := db.db.UpdateItem(&dynamodb.UpdateItemInput{
+	_, err = db.db.UpdateItem(&dynamodb.UpdateItemInput{
 		TableName: aws.String(db.tableName),
 		Key: map[string]*dynamodb.AttributeValue{
 			"PK": {
@@ -316,8 +370,10 @@ func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, status string) error {
 				S: aws.String(sort),
 			},
 		},
-		ReturnValues:     aws.String("UPDATED_NEW"),
-		UpdateExpression: aws.String("SET #ModifiedDate = :m, #Status = :s, #GSI2SK = :gsi2sk"),
+		ReturnValues: aws.String("UPDATED_NEW"),
+		UpdateExpression: aws.String(
+			"SET #ModifiedDate = :m, #Status = :s, #GSI2SK = :gsi2sk"),
+		ConditionExpression: aws.String("#Status = :old"),
 		ExpressionAttributeNames: map[string]*string{
 			"#ModifiedDate": aws.String("ModifiedDate"),
 			"#Status":       aws.String("Status"),
@@ -328,10 +384,13 @@ func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, status string) error {
 				S: aws.String(modifiedDate),
 			},
 			":s": {
-				S: aws.String(status),
+				S: aws.String(newStatus),
+			},
+			":old": {
+				S: aws.String(oldStatus),
 			},
 			":gsi2sk": {
-				S: aws.String(fmt.Sprintf("%s#%s", status, modifiedDate)),
+				S: aws.String(fmt.Sprintf("%s#%s", newStatus, modifiedDate)),
 			},
 		},
 	})
