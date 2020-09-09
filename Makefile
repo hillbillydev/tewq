@@ -1,4 +1,5 @@
 AWS_BRANCH ?= "dev"
+UNAME := $(shell uname)
 
 target:
 	$(info ${HELP_MESSAGE})
@@ -13,7 +14,11 @@ test:
 build-erd:
 	$(info [*] Bulilding Entity Relationship Diagram...)
 	cat erd.er | docker run --rm -i kaishuu0123/erd-go | docker run --rm -i risaacson/graphviz dot -T png > erd.png
+
+preview-erd: build-erd
+ifeq ($(UNAME), Darwin)
 	open erd.png
+endif
 
 define HELP_MESSAGE
 Environment variables:

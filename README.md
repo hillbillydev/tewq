@@ -44,7 +44,7 @@ Me trying to apply what I have learned from [this book](https://www.dynamodbbook
 
 ## Entity Relationship Diagram
 
-![ERD](./erd.png)
+![ERD](https://github.com/Tinee/tewq/blob/assets/erd.png)
 
 
 ## Testing
