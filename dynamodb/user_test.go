@@ -11,6 +11,7 @@ func TestGetUser(t *testing.T) {
 	user := User{
 		FirstName: "John",
 		LastName:  "Doe",
+		UserName:  "jdoe123",
 		Email:     "johnDoe@gmail.com",
 	}
 	tdb, err := NewTestDynamoDB()
@@ -28,6 +29,7 @@ func TestGetUser(t *testing.T) {
 
 	is.Equal(u.FirstName, fetched.FirstName)
 	is.Equal(u.LastName, fetched.LastName)
+	is.Equal(u.UserName, fetched.UserName)
 	is.Equal(u.Email, fetched.Email)
 
 }
@@ -37,11 +39,12 @@ func TestGetUserByEmail(t *testing.T) {
 	user := User{
 		FirstName: "John",
 		LastName:  "Smith",
+		UserName:  "jd_gunner",
 		Email:     "jd.smith@gmail.com",
 	}
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)
-	defer tdb.Close()
+	// defer tdb.Close()
 
 	u, err := tdb.AddUser(user)
 	t.Log(u)
@@ -49,6 +52,8 @@ func TestGetUserByEmail(t *testing.T) {
 	fetched, err := tdb.GetUserByEmail(u.Email)
 	is.NoErr(err)
 	t.Log(fetched)
+	is.Equal(u.ID, fetched.ID)
+	is.Equal(u.UserName, fetched.UserName)
 	is.Equal(u.FirstName, fetched.FirstName)
 	is.Equal(u.LastName, fetched.LastName)
 	is.Equal(u.Email, fetched.Email)
@@ -93,7 +98,8 @@ func TestAddNewOrdersToUserAndGetOrdersByID(t *testing.T) {
 		fetchedOrder, err := tdb.GetUserOrderByOrderID(oid)
 		is.NoErr(err)
 		t.Logf(" %+v", fetchedOrder)
-		// is.Equal(fetchedOrder.OrderID, oid)
+		is.Equal(fetchedOrder.OrderID, oid)
+		// is.Equal(fetchedOrder.)
 
 	}
 
@@ -104,6 +110,7 @@ func TestUpdateUserOrdersStatus(t *testing.T) {
 	user := User{
 		FirstName: "John",
 		LastName:  "Doe",
+		UserName:  "jdoe123",
 		Email:     "johnDoe@gmail.com",
 	}
 
@@ -114,6 +121,15 @@ func TestUpdateUserOrdersStatus(t *testing.T) {
 	u, err := tdb.AddUser(user)
 	t.Log(u)
 	is.NoErr(err)
+	fetched, err := tdb.GetUser(u.ID)
+
+	is.NoErr(err)
+	t.Log(fetched)
+
+	is.Equal(u.FirstName, fetched.FirstName)
+	is.Equal(u.LastName, fetched.LastName)
+	is.Equal(u.UserName, fetched.UserName)
+	is.Equal(u.Email, fetched.Email)
 
 	orders := []Order{
 		{
@@ -133,6 +149,9 @@ func TestUpdateUserOrdersStatus(t *testing.T) {
 		is.NoErr(err)
 		orderIDs = append(orderIDs, order.OrderID)
 	}
+
+}
+func TestAddNewOrderItemsAndGetOrderItems(t *testing.T) {
 
 }
 

@@ -47,18 +47,6 @@ type Basket struct {
 	Products []Product `json:"products"`
 }
 
-type BasketItem struct {
-	CustomerID      SortableID `json:"customerId" dynamodbav:"CustomerId"`
-	ProductID       SortableID `json:"productId" dynamodbav:"ProductId"`
-	ProductOptionID SortableID `json:"productOptionId" dynamodbav:"ProductOptionId"`
-}
-
-type BasketItem struct {
-	CustomerID      SortableID `json:"customerId" dynamodbav:"CustomerId"`
-	ProductID       SortableID `json:"productId" dynamodbav:"ProductId"`
-	ProductOptionID SortableID `json:"productOptionId" dynamodbav:"ProductOptionId"`
-}
-
 // BasketItem contains the pointers to which customer
 // wants which product within the basket.
 type BasketItem struct {
@@ -427,96 +415,4 @@ func decodePaginationKey(pkey ProductCategoryPaginationKey) map[string]*dynamodb
 
 func zerosPricePadding(i int) string {
 	return fmt.Sprintf("%015d", i)
-}
-
-func (db *DynamoDB) AddBasketItem(item BasketItem) error {
-	pk := fmt.Sprintf("BASKET#%s", item.CustomerID)
-	sort := fmt.Sprintf("PRODUCT#%s", time.Now().Format(time.RFC3339))
-
-	i, err := dynamodbattribute.MarshalMap(&item)
-	if err != nil {
-		return err
-	}
-	i["Type"] = &dynamodb.AttributeValue{S: aws.String("BasketItem")}
-	i["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
-	i["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
-
-	_, err = db.db.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String(db.tableName),
-		Item:      i,
-	})
-
-	return err
-}
-
-type SortableID ksuid.KSUID
-
-func NewSortableID() SortableID      { return SortableID(ksuid.New()) }
-func (id SortableID) String() string { return ksuid.KSUID(id).String() }
-
-func (id *SortableID) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	v := fmt.Sprintf("%s", id)
-	av.S = &v
-	return nil
-}
-
-func (id *SortableID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	if av.S == nil {
-		return nil
-	}
-
-	v, err := ksuid.Parse(*av.S)
-	if err != nil {
-		return err
-	}
-	sid := SortableID(v)
-	id = &sid
-
-	return nil
-}
-
-func (db *DynamoDB) AddBasketItem(item BasketItem) error {
-	pk := fmt.Sprintf("BASKET#%s", item.CustomerID)
-	sort := fmt.Sprintf("PRODUCT#%s", time.Now().Format(time.RFC3339))
-
-	i, err := dynamodbattribute.MarshalMap(&item)
-	if err != nil {
-		return err
-	}
-	i["Type"] = &dynamodb.AttributeValue{S: aws.String("BasketItem")}
-	i["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
-	i["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
-
-	_, err = db.db.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String(db.tableName),
-		Item:      i,
-	})
-
-	return err
-}
-
-type SortableID ksuid.KSUID
-
-func NewSortableID() SortableID      { return SortableID(ksuid.New()) }
-func (id SortableID) String() string { return ksuid.KSUID(id).String() }
-
-func (id *SortableID) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	v := fmt.Sprintf("%s", id)
-	av.S = &v
-	return nil
-}
-
-func (id *SortableID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	if av.S == nil {
-		return nil
-	}
-
-	v, err := ksuid.Parse(*av.S)
-	if err != nil {
-		return err
-	}
-	sid := SortableID(v)
-	id = &sid
-
-	return nil
 }
