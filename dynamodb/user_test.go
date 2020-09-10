@@ -44,7 +44,7 @@ func TestGetUserByEmail(t *testing.T) {
 	}
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)
-	// defer tdb.Close()
+	defer tdb.Close()
 
 	u, err := tdb.AddUser(user)
 	t.Log(u)
@@ -60,11 +60,12 @@ func TestGetUserByEmail(t *testing.T) {
 
 }
 
-func TestAddNewOrdersToUserAndGetOrdersByID(t *testing.T) {
+func TestAddNewOrdersAndGetOrdersByOrderID(t *testing.T) {
 	is := is.New(t)
 	user := User{
 		FirstName: "John",
 		LastName:  "Doe",
+		UserName:  "jdoeman",
 		Email:     "johnDoe@gmail.com",
 	}
 
@@ -78,24 +79,47 @@ func TestAddNewOrdersToUserAndGetOrdersByID(t *testing.T) {
 
 	orders := []Order{
 		{
-			UserID:          u.ID,
-			ShippingAddress: "123 Main Street NY, NY 12345",
-			TotalAmount:     5000,
+			UserID: u.ID,
+			ShippingAddress: Address{
+				AddressType:   "Home",
+				StreetAddress: "123 Main St",
+				ZipCode:       "12345",
+				State:         "CA",
+				Country:       "US",
+			},
+			TotalAmount: 5000,
 		},
 		{
-			UserID:          u.ID,
-			ShippingAddress: "123 Main Street NY, NY 12345",
-			TotalAmount:     6700,
+			UserID: u.ID,
+			ShippingAddress: Address{
+				AddressType:   "Work",
+				StreetAddress: "123 Wall St",
+				ZipCode:       "543322",
+				State:         "NY",
+				Country:       "USA",
+			},
+			TotalAmount: 6700,
+		},
+		{
+			UserID: u.ID,
+			ShippingAddress: Address{
+				AddressType:   "Home",
+				StreetAddress: "Roslagsgatan 10",
+				ZipCode:       "111 28",
+				State:         "STHLM",
+				Country:       "SE",
+			},
+			TotalAmount: 6700,
 		},
 	}
 	orderIDs := []SortableID{}
-	for _, op := range orders {
-		order, err := tdb.AddNewOrderToUser(u.ID, op)
+	for _, o := range orders {
+		order, err := tdb.AddOrder(o)
 		is.NoErr(err)
 		orderIDs = append(orderIDs, order.OrderID)
 	}
 	for _, oid := range orderIDs {
-		fetchedOrder, err := tdb.GetUserOrderByOrderID(oid)
+		fetchedOrder, err := tdb.GetOrderByOrderID(oid)
 		is.NoErr(err)
 		t.Logf(" %+v", fetchedOrder)
 		is.Equal(fetchedOrder.OrderID, oid)
@@ -105,7 +129,79 @@ func TestAddNewOrdersToUserAndGetOrdersByID(t *testing.T) {
 
 }
 
-func TestUpdateUserOrdersStatus(t *testing.T) {
+func TestUpdateStatusAttrForOrders(t *testing.T) {
+	is := is.New(t)
+	user := User{
+		FirstName: "John",
+		LastName:  "Doe",
+		UserName:  "jdoe123",
+		Email:     "johnDoe@gmail.com",
+	}
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	defer tdb.Close()
+
+	u, err := tdb.AddUser(user)
+	t.Log(u)
+	is.NoErr(err)
+	fetchedUser, err := tdb.GetUser(u.ID)
+
+	is.NoErr(err)
+	t.Log(fetchedUser)
+
+	is.Equal(u.FirstName, fetchedUser.FirstName)
+	is.Equal(u.LastName, fetchedUser.LastName)
+	is.Equal(u.UserName, fetchedUser.UserName)
+	is.Equal(u.Email, fetchedUser.Email)
+
+	orders := []Order{
+		{
+			UserID: u.ID,
+			ShippingAddress: Address{
+				AddressType:   "Home",
+				StreetAddress: "123 Main St",
+				ZipCode:       "12345",
+				State:         "CA",
+				Country:       "US",
+			},
+			TotalAmount: 5000,
+		},
+		{
+			UserID: u.ID,
+			ShippingAddress: Address{
+				AddressType:   "Work",
+				StreetAddress: "123 Wall St",
+				ZipCode:       "12345",
+				State:         "NY",
+				Country:       "USA",
+			},
+			TotalAmount: 6700,
+		},
+	}
+	statuses := []string{StatusShippedOrder, StatusShippedOrder}
+	orderIDs := []SortableID{}
+	for _, o := range orders {
+		order, err := tdb.AddOrder(o)
+		is.NoErr(err)
+		orderIDs = append(orderIDs, order.OrderID)
+	}
+	for i, oid := range orderIDs {
+		err = tdb.UpdateOrderStatus(fetchedUser.ID, oid, statuses[i])
+		is.NoErr(err)
+	}
+
+}
+
+// func TestAddUserAlreadyExists(t *testing.T) {
+
+// }
+
+// func TestAddOrderLineItemsToUser(t *testing.T) {
+
+// }
+
+func TestAddOrderLineItemsAndGetOrderLineItems(t *testing.T) {
 	is := is.New(t)
 	user := User{
 		FirstName: "John",
@@ -121,44 +217,58 @@ func TestUpdateUserOrdersStatus(t *testing.T) {
 	u, err := tdb.AddUser(user)
 	t.Log(u)
 	is.NoErr(err)
-	fetched, err := tdb.GetUser(u.ID)
+	fetchedUser, err := tdb.GetUser(u.ID)
 
 	is.NoErr(err)
-	t.Log(fetched)
+	t.Log(fetchedUser)
 
-	is.Equal(u.FirstName, fetched.FirstName)
-	is.Equal(u.LastName, fetched.LastName)
-	is.Equal(u.UserName, fetched.UserName)
-	is.Equal(u.Email, fetched.Email)
+	is.Equal(u.FirstName, fetchedUser.FirstName)
+	is.Equal(u.LastName, fetchedUser.LastName)
+	is.Equal(u.UserName, fetchedUser.UserName)
+	is.Equal(u.Email, fetchedUser.Email)
+	o := Order{
+		UserID: fetchedUser.ID,
+		ShippingAddress: Address{
+			AddressType:   "Home",
+			StreetAddress: "123 Main St",
+			ZipCode:       "12345",
+			State:         "CA",
+			Country:       "US",
+		},
+		TotalAmount: 5000,
+	}
 
-	orders := []Order{
+	oAddedToDB, err := tdb.AddOrder(o)
+	t.Log(oAddedToDB)
+	is.NoErr(err)
+
+	oLineItems := []OrderLineItem{
 		{
-			UserID:          u.ID,
-			ShippingAddress: "123 Main Street NY, NY 12345",
-			TotalAmount:     5000,
+			OrderID: oAddedToDB.OrderID,
+			//todo: any way to link productID w/o a getproduct req?
+			ProductID:   NewSortableID(),
+			Price:       500,
+			Quantity:    5,
+			TotalAmount: 2500,
 		},
 		{
-			UserID:          u.ID,
-			ShippingAddress: "123 Main Street NY, NY 12345",
-			TotalAmount:     6700,
+			OrderID: oAddedToDB.OrderID,
+			//todo: any way to link productID w/o a getproduct req?
+			ProductID:   NewSortableID(),
+			Price:       500,
+			Quantity:    5,
+			TotalAmount: 2500,
 		},
 	}
-	orderIDs := []SortableID{}
-	for _, op := range orders {
-		order, err := tdb.AddNewOrderToUser(u.ID, op)
+
+	for _, i := range oLineItems {
+		_, err := tdb.AddOrderLineItem(i)
 		is.NoErr(err)
-		orderIDs = append(orderIDs, order.OrderID)
 	}
+	fetchedItems, err := tdb.GetOrderLineItemsByOrderID(oAddedToDB.OrderID)
+	is.NoErr(err)
+	is.Equal(len(fetchedItems), len(oLineItems))
+	t.Log(fetchedItems)
+	t.Log(len(fetchedItems))
 
 }
-func TestAddNewOrderItemsAndGetOrderItems(t *testing.T) {
-
-}
-
-// func TestAddUserAlreadyExists(t *testing.T) {
-
-// }
-
-// func TestAddNewOrderItemToUser(t *testing.T) {
-
-// }

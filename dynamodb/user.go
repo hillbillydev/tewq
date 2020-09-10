@@ -10,59 +10,80 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
-/*
-TODO:
-- make shipping address into a document type
-- address -----> {"StreetAddress":"123 Main St", "State": "NY", "Country":"USA"}
+//Custom err types
+// ------------------------------------------------
 
+//ErrUserItemNotFound is thrown when the db doesn't find the user item resource
+var ErrUserItemNotFound = errors.New("User metadata item not found in db")
 
-*/
+//ErrOrderItemNotFound is thrown when db doesn't find the order item resource
+var ErrOrderItemNotFound = errors.New("Order item(s) not found in db")
 
-// var ErrUserAlreadyExists =
+//ErrOrderLineItemNotFound is thrown when db doesn't find the order line item resource
+var ErrOrderLineItemNotFound = errors.New("Order line item not found in db")
 
-//TODO: should these be custom string type instead of string?
-//Order status options
+//Order status options represents a customer's order actions
+// ------------------------------------------------
 const (
-	StatusNewOrder       = "PLACED"
-	StatusShippedOrder   = "SHIPPED"
-	StatusDeliveredOrder = "DELIVERED"
+	// StatusPendingOrder   = "PENDING"   //Order pending status
+	StatusNewOrder       = "PLACED"    //Order placed status
+	StatusShippedOrder   = "SHIPPED"   //Order shipped status
+	StatusDeliveredOrder = "DELIVERED" //Order delivered status
+	// StatusCancelledOrder = "CANCELLED" //Order was cancelled by customer
+	// StatusDisputedOrder  = "DISPUTED"  //Order was disputed by customer
+	// StatusRefundedOrder  = "REFUNDED"  //Seller refunded customer order
+
 )
 
+//Custom Struct types for Users, Orders, and OrderLineItem entities
+// ------------------------------------------------
+
+//User struct represents the user's metadata item attribute fields
 type User struct {
-	ID SortableID `json:"userId" dynamodbav:"UserId"`
-	//TODO: username?
-	CreatedDate string `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
-	UserName    string `json:"userName" dynamodbav:"UserName"`
-	Email       string `json:"email" dynamodbav:"Email"`
-	FirstName   string `json:"firstName" dynamodbav:"FirstName"`
-	LastName    string `json:"lastName" dynamodbav:"LastName"`
+	ID          SortableID `json:"userId" dynamodbav:"UserId"`
+	CreatedDate time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	UserName    string     `json:"userName" dynamodbav:"UserName"`
+	Email       string     `json:"email" dynamodbav:"Email"`
+	FirstName   string     `json:"firstName" dynamodbav:"FirstName"`
+	LastName    string     `json:"lastName" dynamodbav:"LastName"`
 }
 
+//Address will be marshalled into a dynamodb map attr
+//in the order item
+type Address struct {
+	AddressType   string
+	StreetAddress string
+	ZipCode       string
+	State         string
+	Country       string //TODO:  ISO 3166-1 alpha-2 country code instead?
+}
+
+//Order struct represents an order attribute fields for a user's order
 type Order struct {
 	OrderID         SortableID `json:"orderId" dynamodbav:"OrderId"`
 	UserID          SortableID `json:"userId" dynamodbav:"UserId"`
-	PurchasedDate   string     `json:"purchasedDate" dynamodbav:"PurchasedDate"`
-	ModifiedDate    string     `json:"modifiedDate" dynamodbav:"ModifiedDate"`
-	ShippingAddress string     `json:"shippingAddress" dynamodbav:"ShippingAddress"`
+	PurchasedDate   time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc"`
+	ModifiedDate    time.Time  `json:"modifiedDate" dynamodbav:"ModifiedDate"`
+	ShippingAddress Address    `json:"shippingAddress" dynamodbav:"ShippingAddress"`
 	Status          string     `json:"status" dynamodbav:"Status"`
 	TotalAmount     int        `json:"totalAmount" dynamodbav:"TotalAmount"`
-	DeliverDate     string     `json:"deliverDate" dynamodbav:"DeliverDate"`
-	//TODO:
-	//change to EstimatedDeliverDate and ActualDeliverDate
-	//once we change the status of the order to "DELIVERED" we'll update the DeliverDate val
-	//on ddb
+	EstDeliverDate  time.Time  `json:"estDeliverDate" dynamodbav:"EstDeliverDate,omitempty"`
+	ActDeliverDate  time.Time  `json:"ActDeliverDate" dynamodbav:"ActDeliverDate,omitempty"`
+	// Currency int  //TODO: add currency types
 }
 
-type OrderItem struct {
-	ItemID    SortableID `json:"orderItemId" dynamodbav:"OrderItemId"`
-	OrderID   SortableID `json:"orderId" dynamodbav:"OrderId"`
-	ProductID SortableID `json:"productId" dynamodbav:"ProductId"`
-	Price     int        `json:"price" dynamodbav:"Price"`
-	Quantity  int        `json:"quantity" dynamodbav:"Quantity"`
+//OrderLineItem represents itemized attribute fields for an order
+type OrderLineItem struct {
+	ItemID      SortableID `json:"orderItemId" dynamodbav:"OrderItemId"`
+	OrderID     SortableID `json:"orderId" dynamodbav:"OrderId"`
+	ProductID   SortableID `json:"productId" dynamodbav:"ProductId"`
+	Price       int        `json:"price" dynamodbav:"Price"`
+	Quantity    int        `json:"quantity" dynamodbav:"Quantity"`
+	TotalAmount int        `json:"totalAmount" dynamodbav: "TotalAmount"`
+	// Currency int  //TODO: add currency types
 }
 
-//Conditional Put on a non-key attribute
-//che
+// ------------------------------------------------
 
 //TODO: check db to see if that email is in already in the db
 
@@ -70,7 +91,7 @@ type OrderItem struct {
 func (db *DynamoDB) AddUser(u User) (User, error) {
 
 	u.ID = NewSortableID()
-	u.CreatedDate = time.Now().Format(time.RFC3339)
+	u.CreatedDate = time.Now()
 
 	pk := fmt.Sprintf("USER#%s", u.ID)
 	sort := "METADATA#"
@@ -135,7 +156,7 @@ func (db *DynamoDB) GetUser(id SortableID) (User, error) {
 
 	}
 	if len(res.Items) == 0 {
-		return User{}, errors.New("No user item in db with PK given")
+		return User{}, ErrUserItemNotFound
 	}
 	item := res.Items[0]
 
@@ -151,7 +172,7 @@ func (db *DynamoDB) GetUser(id SortableID) (User, error) {
 
 }
 
-//GetUserByEmail fetches a single user by their email
+//GetUserByEmail fetches a single user by their email using the gsi1
 func (db *DynamoDB) GetUserByEmail(email string) (User, error) {
 	var result User
 	gsi1pk := fmt.Sprintf("EMAIL#%s", email)
@@ -178,7 +199,7 @@ func (db *DynamoDB) GetUserByEmail(email string) (User, error) {
 		return User{}, err
 	}
 	if len(res.Items) == 0 {
-		return User{}, errors.New("No user order item(s) in db with PK given")
+		return User{}, ErrUserItemNotFound
 	}
 	item := res.Items[0]
 	err = dynamodbattribute.UnmarshalMap(item, &result)
@@ -189,32 +210,33 @@ func (db *DynamoDB) GetUserByEmail(email string) (User, error) {
 
 }
 
-//AddNewOrderToUser takes a userId and attempts to put a new item with the User's Order
-func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error) {
+//AddOrder takes a userId and attempts to put a new order item for the customer
+func (db *DynamoDB) AddOrder(order Order) (Order, error) {
 
 	order.OrderID = NewSortableID()
-	order.PurchasedDate = time.Now().Format(time.RFC3339)
+	order.PurchasedDate = time.Now()
 	order.ModifiedDate = order.PurchasedDate
 	order.Status = StatusNewOrder
 
-	pk := fmt.Sprintf("USER#%s", id)
+	pk := fmt.Sprintf("USER#%s", order.UserID)
 	sort := fmt.Sprintf("ORDER#%s", order.OrderID)
 
 	//using an inverted index but with the new GSI1 attrs
 	// For this GSI:
-	// if we query GSI1PK=ORDER#<id> AND begins_with(GSI1SK,"USER#") we'll get the
-	// user that the order belongs to
+	// if we query GSI1PK=ORDER#<id> AND GSI1SK=METADATA#
+	// we'll get the user that the order belongs to
 	gs1pk := sort
-	gs1sk := pk
+	gs1sk := "METADATA#"
 
+	//NOTE: gsi2 deprecated for now
 	//setting GSI2 attrs
 	//below
 	//NOTE: since we'd need to update the status at least 2 more times
 	// this may not be most optimal from a WCU pov, but we'll review this soon
 	//using a composite sort key of OrderStatus & MODIFIEDDATE
 	//GS2PK=USER#<id> GSI2SK=<STATUS>#<MODIFIEDDATE>
-	gs2pk := pk
-	gs2sk := fmt.Sprintf("%s#%s", order.Status, order.PurchasedDate)
+	// gs2pk := pk
+	// gs2sk := fmt.Sprintf("%s#%s", order.Status, order.PurchasedDate)
 
 	item, err := dynamodbattribute.MarshalMap(&order)
 	if err != nil {
@@ -227,8 +249,8 @@ func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error)
 	item["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
 	item["GSI1SK"] = &dynamodb.AttributeValue{S: aws.String(gs1sk)}
 
-	item["GSI2PK"] = &dynamodb.AttributeValue{S: aws.String(gs2pk)}
-	item["GSI2SK"] = &dynamodb.AttributeValue{S: aws.String(gs2sk)}
+	// item["GSI2PK"] = &dynamodb.AttributeValue{S: aws.String(gs2pk)}
+	// item["GSI2SK"] = &dynamodb.AttributeValue{S: aws.String(gs2sk)}
 
 	_, err = db.db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(db.tableName),
@@ -239,10 +261,11 @@ func (db *DynamoDB) AddNewOrderToUser(id SortableID, order Order) (Order, error)
 
 }
 
-// GetUserOrdersByUserID fetches a customer's orders by their userId
-func (db *DynamoDB) GetUserOrdersByUserID(id SortableID) ([]Order, error) {
+// GetOrdersByUserID fetches a customer's orders by their userId
+//if forward is false, ScanIndexForward will be false (descending query)
+func (db *DynamoDB) GetOrdersByUserID(uid SortableID, limit int64, forward bool) ([]Order, error) {
 	var result []Order
-	pk := fmt.Sprintf("USER#%s", id)
+	pk := fmt.Sprintf("USER#%s", uid)
 	sort := "ORDER#"
 	res, err := db.db.Query(&dynamodb.QueryInput{
 		TableName:              aws.String(db.tableName),
@@ -259,12 +282,14 @@ func (db *DynamoDB) GetUserOrdersByUserID(id SortableID) ([]Order, error) {
 				S: aws.String(sort),
 			},
 		},
+		Limit:            aws.Int64(limit),
+		ScanIndexForward: aws.Bool(forward),
 	})
 	if err != nil {
 		return nil, err
 	}
 	if len(res.Items) == 0 {
-		return nil, errors.New("No user order item(s) in db with PK given")
+		return nil, ErrOrderItemNotFound
 	}
 	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
 	if err != nil {
@@ -284,17 +309,17 @@ https://docs.aws.amazon.com/sdk-for-go/api/service/dynamodb/expression/#KeyBuild
 
 //:one
 
-//GetUserOrderByOrderID uses the orderID as an input
+//GetOrderByOrderID uses the orderID as an input
 //and returns an order item using the gsi key
 //entrypoint: fetch a user's order given an orderID
-func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
+func (db *DynamoDB) GetOrderByOrderID(oid SortableID) (Order, error) {
 	var result Order
-	gsi1pk := fmt.Sprintf("ORDER#%s", id)
-	gsi1sk := "USER#"
+	gsi1pk := fmt.Sprintf("ORDER#%s", oid)
+	gsi1sk := "METADATA#"
 	res, err := db.db.Query(&dynamodb.QueryInput{
 		TableName:              aws.String(db.tableName),
 		IndexName:              aws.String("GSI1"),
-		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk And begins_with(#GSI1SK, :gsi1sk)"),
+		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk And #GSI1SK = :gsi1sk"),
 		ExpressionAttributeNames: map[string]*string{
 			"#GSI1PK": aws.String("GSI1PK"),
 			"#GSI1SK": aws.String("GSI1SK"),
@@ -312,7 +337,7 @@ func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
 		return Order{}, err
 	}
 	if len(res.Items) == 0 {
-		return Order{}, errors.New("No user order item in db with GSI1PK given")
+		return Order{}, ErrOrderItemNotFound
 	}
 	item := res.Items[0]
 
@@ -324,11 +349,6 @@ func (db *DynamoDB) GetUserOrderByOrderID(id SortableID) (Order, error) {
 	return result, err
 
 }
-
-//GetUserOrdersByOrderIDAndStatus
-// func (db *DynamoDB) GetUserOrdersByOrderIDAndStatus(id SortableID) ([]Order, error) {
-
-// }
 
 func validStatus(status string) bool {
 	items := []string{StatusNewOrder, StatusShippedOrder, StatusDeliveredOrder}
@@ -351,9 +371,12 @@ func getPriorStatus(newStatus string) (string, error) {
 	}
 }
 
-// UpdateUserOrderStatus updates a user's order status
-// order progression goes from PLACED --> SHIPPED --> DELIVERED
-func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, newStatus string) error {
+// An alternative for order progression status updating
+// and ensure
+
+// UpdateOrderStatus updates a user's order status
+// simple order progression goes from PLACED --> SHIPPED --> DELIVERED
+func (db *DynamoDB) UpdateOrderStatus(uid, oid SortableID, newStatus string) error {
 
 	modifiedDate := time.Now().Format(time.RFC3339)
 
@@ -379,13 +402,15 @@ func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, newStatus string) error {
 			},
 		},
 		ReturnValues: aws.String("UPDATED_NEW"),
+		// UpdateExpression: aws.String(
+		// 	"SET #ModifiedDate = :m, #Status = :s, #GSI2SK = :gsi2sk"),
 		UpdateExpression: aws.String(
-			"SET #ModifiedDate = :m, #Status = :s, #GSI2SK = :gsi2sk"),
+			"SET #ModifiedDate = :m, #Status = :s"),
 		ConditionExpression: aws.String("#Status = :old"),
 		ExpressionAttributeNames: map[string]*string{
 			"#ModifiedDate": aws.String("ModifiedDate"),
 			"#Status":       aws.String("Status"),
-			"#GSI2SK":       aws.String("GSI2SK"),
+			// "#GSI2SK":       aws.String("GSI2SK"),
 		},
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":m": {
@@ -397,33 +422,33 @@ func (db *DynamoDB) UpdateUserOrderStatus(uid, oid, newStatus string) error {
 			":old": {
 				S: aws.String(oldStatus),
 			},
-			":gsi2sk": {
-				S: aws.String(fmt.Sprintf("%s#%s", newStatus, modifiedDate)),
-			},
+			// ":gsi2sk": {
+			// 	S: aws.String(fmt.Sprintf("%s#%s", newStatus, modifiedDate)),
+			// },
 		},
 	})
 
 	return err
 }
 
-//TODO: add GSI2
-// func (db *DynamoDB) GetUserOrder(id SortableID) (Order, error) {
+//TODO: validate TotalAmount = Price * Quantity
 
-// }
+//AddOrderLineItem adds a new order line item to a user's order
+func (db *DynamoDB) AddOrderLineItem(item OrderLineItem) (OrderLineItem, error) {
+	item.ItemID = NewSortableID()
 
-//AddNewOrderItem adds a new item to a user's order
-func (db *DynamoDB) AddNewOrderItem(item OrderItem) error {
-	pk := fmt.Sprintf("ITEM#%s", item.ItemID)
+	pk := fmt.Sprintf("ORDERITEM#%s", item.ItemID)
 	sort := fmt.Sprintf("ORDER#%s", item.OrderID)
+
 	//using an inverted index but with the new GSI1 attrs
 	gs1pk := sort
 	gs1sk := pk
 
 	i, err := dynamodbattribute.MarshalMap(&item)
 	if err != nil {
-		return err
+		return OrderLineItem{}, err
 	}
-	i["Type"] = &dynamodb.AttributeValue{S: aws.String("OrderItem")}
+	i["Type"] = &dynamodb.AttributeValue{S: aws.String("OrderLineItem")}
 	i["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	i["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
 	i["GSI1PK"] = &dynamodb.AttributeValue{S: aws.String(gs1pk)}
@@ -433,11 +458,55 @@ func (db *DynamoDB) AddNewOrderItem(item OrderItem) error {
 		Item:      i,
 	})
 
-	return err
+	return item, err
 
 }
 
-//GetUserOrderItems fetches many order items
-func (db *DynamoDB) GetUserOrderItems(id SortableID) ([]OrderItem, error) {
+//GetOrderLineItemsByOrderID fetches many order items
+func (db *DynamoDB) GetOrderLineItemsByOrderID(oid SortableID) ([]OrderLineItem, error) {
+	var result []OrderLineItem
+	gsi1pk := fmt.Sprintf("ORDER#%s", oid)
+	gsi1sk := "ORDERITEM#"
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		ScanIndexForward:       aws.Bool(true),
+		IndexName:              aws.String("GSI1"),
+		KeyConditionExpression: aws.String("#GSI1PK = :gsi1pk AND begins_with(#GSI1SK,:gsi1sk)"),
+		ExpressionAttributeNames: map[string]*string{
+			"#GSI1PK": aws.String("GSI1PK"),
+			"#GSI1SK": aws.String("GSI1SK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":gsi1pk": {
+				S: aws.String(gsi1pk),
+			},
+			":gsi1sk": {
+				S: aws.String(gsi1sk),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Items) == 0 {
+		return nil, ErrOrderLineItemNotFound
+	}
+	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, err
 
 }
+
+//deprecated for now
+//entrypoint: get all user orders based on an orderID and status option
+//GetUserOrdersByOrderIDAndStatus
+// func (db *DynamoDB) GetUserOrdersByOrderIDAndStatus(oid SortableID) ([]Order, error) {
+
+// }
+
+//GetOpenOrders retrieves multiple users's open orders
+// func (db *DynamoDB) GetOpenOrders(uid, oid SortableID) {
+
+// }
