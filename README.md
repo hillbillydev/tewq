@@ -1,5 +1,9 @@
 # Tewq
 
+<p align="center">
+<img src="https://github.com/Tinee/tewq/workflows/Go/badge.svg" alt="Tests Status" />
+</p>
+
 Me trying to apply what I have learned from [this book](https://www.dynamodbbook.com/), and also to learn more about "Serverless".
 
 ## DynamoDB Access Patterns
