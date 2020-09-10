@@ -1,31 +1,39 @@
 # Tewq
 
+Me trying to apply what I have learned from [this book](https://www.dynamodbbook.com/), and also to learn more about "Serverless".
+
 <p align="center">
 <img src="https://github.com/Tinee/tewq/workflows/Go/badge.svg" alt="Tests Status" />
 </p>
 
-Me trying to apply what I have learned from [this book](https://www.dynamodbbook.com/), and also to learn more about "Serverless".
+# DynamoDB
 
-## DynamoDB Access Patterns
+## Access Patterns
 
-| Access Pattern                     | Index      | Parameters                                        |
-|:-----------------------------------|:-----------|:--------------------------------------------------|
-| Add Product to Basket              | Main Table | * CustomerID <br /> * ProductID <br /> * OptionID |
-| Get Baskets Products               | Main Table | * CustomerID                                      |
-| Create Product                     | Main Table | * Product                                         |
-| Get Product                        | Main Table | * ProductID                                       |
-| Create an Option for an Product    | Main Table | * Option                                          |
-| Get Products by Category and Price | GSI1       | * Category <br /> * Price                         |
-| Get Products by Category           | GSI1       | * Category                                        |
-| Get Products Reviews               | Main Table | * ProductID                                       |
-| Get Users latest Orders            | Main Table | * UserID                                          |
-| Get Users latest Reviews           | GSI1       | * UserID <br /> * Date                            |
-| Get Order                          | GSI1       | * OrderID                                         |
-| Get Order Information              | GSI1       | * OrderID                                         |
+|      Access Pattern     | Index |                   Key Condition                   | Filter Condition |
+|:-----------------------:|:-----:|:-------------------------------------------------:|------------------|
+|     **Get Products**    |       |                                                   |                  |
+|       by productID      | Table |                   PK = productID                  |                  |
+|       by category       |  GSI1 |                 GSI1PK = category                 |                  |
+|  by category and price  |  GSI1 | GSI1PK = category, GSI1PK between(price1, price2) |                  |
+| **Get Product Reviews** |       |                                                   |                  |
+|       by reviewID       | Table |           PK = productID, SK = reviewID           |                  |
+| **Get Basket Products** |       |                                                   |                  |
+|        by userID        | Table |                    PK = userID                    |                  |
+| **Get Users Dashboard** |       |                                                   |                  |
+|       get reviews       | Table |                  GSI1PK = userID                  |                  |
+|        get orders       | Table |                  GSI1PK = userID                  |                  |
+|     **Get Reviews**     |       |                                                   |                  |
+|       by productID      | Table |     PK = productID, SK begins_with("REVIEW#")     |                  |
+|        by userID        |  GSI1 |    GSI1PK = USER, GSI2SK begins_with("REVIEW#")   |                  |
+|      **Get Orders**     |       |                                                   |                  |
+|        by userID        | Table |       PK = userID, SK begins_with("ORDER#")       |                  |
+|  **Get Orders Details** |       |                                                   |                  |
+|        by orderID       |  GSI1 |                  GSI1PK = orderID                 |                  |
 
-## Entity Chart
+## Entity Charts
 
-### Main Table
+**Main Table**
 
 | Entity             | PK                  | SK                |
 | :----------------- | ----------------:   | ----------------: |
@@ -37,7 +45,7 @@ Me trying to apply what I have learned from [this book](https://www.dynamodbbook
 | OrderLineItem      | ORDERITEM#[ItemID]  | Order#[OrderID]   |
 | Category           | N/A                 | N/A               |
 
-### GSI1
+**GSI1**
 
 | Entity             | GSI1PK                      | GSI1SK             |
 | :----------------- | -------------------:        | -------:           |
@@ -51,10 +59,9 @@ Me trying to apply what I have learned from [this book](https://www.dynamodbbook
 
 ![ERD](https://github.com/Tinee/tewq/blob/assets/erd.png)
 
+# Testing
 
-## Testing
-
-### Integration
+## Integration
 
 1. Install [docker](https://www.docker.com/get-started).
 2. Run `docker-compose up` at the root of the project, this will run DynamoDB locally.
@@ -73,3 +80,4 @@ Me trying to apply what I have learned from [this book](https://www.dynamodbbook
     // defer tdb.Close()
   }
 ```
+
