@@ -76,10 +76,10 @@ func TestAddToManyOptionsToProduct(t *testing.T) {
 
 	tdb, err := NewTestDynamoDB()
 	is.NoErr(err)
-	//defer tdb.Close()
+	defer tdb.Close()
 
 	var fakeOpts []Option
-	for i := 1; i <= 50; i++ {
+	for i := 1; i <= 100; i++ {
 		fakeOpts = append(fakeOpts, Option{
 			Color: "Red",
 		})

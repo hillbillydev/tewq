@@ -100,7 +100,7 @@ func (db *DynamoDB) AddOptionToProduct(id SortableID, option Option) (Product, e
 				L: item,
 			},
 			":limit": {
-				N: aws.String("50"),
+				N: aws.String("100"),
 			},
 		},
 		ConditionExpression: aws.String("attribute_not_exists(#options) OR  size(#options) < :limit"),
