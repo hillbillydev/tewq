@@ -145,9 +145,7 @@ func TestGetProductsByCategory(t *testing.T) {
 		is.NoErr(err)
 	}
 
-	fetched, _, err := tdb.GetProductsByCategory(&GetProductsByCategoryInput{
-		Category: categoryToFetch,
-	})
+	fetched, err := tdb.GetProductsByCategory(categoryToFetch)
 	is.NoErr(err)
 
 	is.True(len(fetched) == 2) // should be 2 products with category "Clubs"
@@ -165,7 +163,7 @@ func TestGetProductsByCategoryAndPrice(t *testing.T) {
 		{
 			Name:     "Golf Club",
 			Category: categoryToFetch,
-			Price:    100,
+			Price:    1000,
 		},
 		{
 			Name:     "Golf Club 2",
@@ -184,46 +182,10 @@ func TestGetProductsByCategoryAndPrice(t *testing.T) {
 		is.NoErr(err)
 	}
 
-	fetched, _, err := tdb.GetProductsByCategory(&GetProductsByCategoryInput{
-		Category:  categoryToFetch,
-		FromPrice: 500,
-		ToPrice:   600,
-	})
+	fetched, err := tdb.GetProductsByCategoryAndPrice(categoryToFetch, 500, 600)
 	is.NoErr(err)
 	is.True(len(fetched) == 1) // should be 1 products with category "Clubs"
 	is.Equal(fetched[0].Price, products[2].Price)
-}
-
-func TestAddBasketItem(t *testing.T) {
-	customerId := NewSortableID()
-	is := is.New(t)
-	product := Product{
-		Name:     "Golf Club",
-		Category: "Shoes",
-		Options: []Option{
-			{
-				Color: "Red",
-				Stock: 2,
-			},
-		},
-	}
-
-	tdb, err := NewTestDynamoDB()
-	is.NoErr(err)
-	//defer tdb.Close()
-
-	// Prepare data to get fetched
-	p, err := tdb.AddProduct(product)
-	is.NoErr(err)
-	o, err := tdb.AddOptionToProduct(p.ID, product.Options[0])
-	is.NoErr(err)
-
-	err = tdb.AddBasketItem(BasketItem{
-		CustomerID:      customerId,
-		ProductID:       p.ID,
-		ProductOptionID: o.ID,
-	})
-	is.NoErr(err)
 }
 
 type TestDynamoDB struct {
