@@ -256,7 +256,7 @@ func (db *DynamoDB) GetProductsByCategory(input *GetProductsByCategoryInput) ([]
 // AddBasketItem adds an BasketItem
 func (db *DynamoDB) AddBasketItem(item BasketItem) error {
 	pk := fmt.Sprintf("BASKET#%s", item.CustomerID)
-	sort := fmt.Sprintf("PRODUCT#%s", time.Now().Format(time.RFC3339))
+	sort := fmt.Sprintf("PRODUCT#%s", NewSortableID())
 
 	i, err := dynamodbattribute.MarshalMap(&item)
 	if err != nil {
@@ -275,6 +275,64 @@ func (db *DynamoDB) AddBasketItem(item BasketItem) error {
 }
 
 // SortableID makes the ID sortable.
+func (db *DynamoDB) GetBasketProducts(customerID SortableID) ([]Product, error) {
+	pk := fmt.Sprintf("BASKET#%s", customerID)
+
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		KeyConditionExpression: aws.String("#PK = :pk"),
+		ExpressionAttributeNames: map[string]*string{
+			"#PK": aws.String("PK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":pk": {
+				S: aws.String(pk),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Items) == 0 {
+		return nil, nil
+	}
+
+	attrs := []map[string]*dynamodb.AttributeValue{}
+	for _, att := range res.Items {
+		attrs = append(attrs, map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String(fmt.Sprintf("PRODUCT#%s", *att["ProductId"].S)),
+			},
+			"SK": {
+				S: aws.String("METADATA#"),
+			},
+		})
+	}
+	batch, err := db.db.BatchGetItem(&dynamodb.BatchGetItemInput{
+		RequestItems: map[string]*dynamodb.KeysAndAttributes{
+			db.tableName: {
+				Keys: attrs,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	prods, ok := batch.Responses[db.tableName]
+	if !ok {
+		return nil, nil
+	}
+
+	var products []Product
+	err = dynamodbattribute.UnmarshalListOfMaps(prods, &products)
+	if err != nil {
+		return nil, err
+	}
+
+	return products, nil
+}
+
 type SortableID ksuid.KSUID
 
 // NewSortableID creates a new sortable id.
