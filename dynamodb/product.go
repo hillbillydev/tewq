@@ -16,8 +16,7 @@ import (
 // Option represents an option for an Product.
 // For example, a product can have many different colors, sizes etc etc.
 type Option struct {
-	ID             SortableID `json:"id" dynamodbav:"Id,omitempty"`
-	CreatedDate    time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	CreatedDate    time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc"`
 	Size           string     `json:"size" dynamodbav:"Size,omitempty"`     // TODO enum?
 	Socket         string     `json:"socket" dynamodbav:"Socket,omitempty"` // TODO enum?
 	Color          string     `json:"color" dynamodbav:"Color,omitempty"`   // TODO enum?
@@ -37,12 +36,11 @@ type Product struct {
 	Price       int        `json:"price" dynamodbav:"Price,omitempty"`
 	Weight      int        `json:"weight" dynamodbav:"Weight,omitempty"`
 	Sale        int        `json:"sale" dynamodbav:"Sale,omitempty"`
-	Options     []Option   `json:"options" dynamodbav:"-"`
+	Options     []Option   `json:"options" dynamodbav:"options,omitempty"`
 }
 
 // AddProduct take a Product p and attempts to put that item into DynamoDB.
 func (db *DynamoDB) AddProduct(p Product) (Product, error) {
-
 	p.CreatedDate = time.Now()
 	p.ID = NewSortableID()
 
@@ -71,27 +69,50 @@ func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 }
 
 // AddOptionToProduct adds a single option to a product.
-func (db *DynamoDB) AddOptionToProduct(id SortableID, option Option) (Option, error) {
-	option.ID = NewSortableID()
+func (db *DynamoDB) AddOptionToProduct(id SortableID, option Option) (Product, error) {
 	option.CreatedDate = time.Now()
 
-	pk := fmt.Sprintf("PRODUCT#%s", id)
-	sort := fmt.Sprintf("OPTION#%s", option.ID)
-
-	item, err := dynamodbattribute.MarshalMap(&option)
+	item, err := dynamodbattribute.MarshalList([]Option{option})
 	if err != nil {
-		return Option{}, err
+		return Product{}, err
 	}
-	item["Type"] = &dynamodb.AttributeValue{S: aws.String("product_option")}
-	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
-	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
 
-	_, err = db.db.PutItem(&dynamodb.PutItemInput{
+	res, err := db.db.UpdateItem(&dynamodb.UpdateItemInput{
 		TableName: aws.String(db.tableName),
-		Item:      item,
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String(fmt.Sprintf("PRODUCT#%s", id)),
+			},
+			"SK": {
+				S: aws.String("METADATA#"),
+			},
+		},
+		ReturnValues:     aws.String(dynamodb.ReturnValueAllNew),
+		UpdateExpression: aws.String("SET #options = list_append(if_not_exists(#options, :empty_list), :newOption)"),
+		ExpressionAttributeNames: map[string]*string{
+			"#options": aws.String("options"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":empty_list": {
+				L: []*dynamodb.AttributeValue{},
+			},
+			":newOption": {
+				L: item,
+			},
+		},
 	})
+	if err != nil {
+		return Product{}, err
+	}
 
-	return option, err
+	var result Product
+
+	err = dynamodbattribute.UnmarshalMap(res.Attributes, &result)
+	if err != nil {
+		return Product{}, err
+	}
+
+	return result, err
 }
 
 // GetProduct fetches the product will all their options included.

@@ -52,8 +52,14 @@ func TestAddOptionToProduct(t *testing.T) {
 	p, err := tdb.AddProduct(product)
 	is.NoErr(err)
 
-	_, err = tdb.AddOptionToProduct(p.ID, option)
+	updatedProduct, err := tdb.AddOptionToProduct(p.ID, option)
 	is.NoErr(err)
+
+	is.True(len(updatedProduct.Options) == 1)
+	is.Equal(updatedProduct.Options[0].Color, option.Color)
+	is.Equal(updatedProduct.Options[0].Size, option.Size)
+	is.Equal(updatedProduct.Options[0].ShaftStiffness, option.ShaftStiffness)
+	is.Equal(updatedProduct.Options[0].Socket, option.Socket)
 }
 
 func TestGetProduct(t *testing.T) {
@@ -66,21 +72,21 @@ func TestGetProduct(t *testing.T) {
 		Weight:      1500,
 		Image:       "s3://images/image.png",
 		Thumbnail:   "s3://images/thumbnail.png",
-	}
-	options := []Option{
-		{
-			Color:          "red",
-			Stock:          1,
-			Size:           "Medium",
-			ShaftStiffness: 11.5,
-			Socket:         "Right",
-		},
-		{
-			Color:          "green",
-			Stock:          2,
-			Size:           "Medium",
-			ShaftStiffness: 11.5,
-			Socket:         "Right",
+		Options: []Option{
+			{
+				Color:          "red",
+				Stock:          1,
+				Size:           "Medium",
+				ShaftStiffness: 11.5,
+				Socket:         "Right",
+			},
+			{
+				Color:          "green",
+				Stock:          2,
+				Size:           "Medium",
+				ShaftStiffness: 11.5,
+				Socket:         "Right",
+			},
 		},
 	}
 
@@ -91,10 +97,6 @@ func TestGetProduct(t *testing.T) {
 	// Prepare data to get fetched
 	p, err := tdb.AddProduct(product)
 	is.NoErr(err)
-	for _, op := range options {
-		_, err := tdb.AddOptionToProduct(p.ID, op)
-		is.NoErr(err)
-	}
 
 	fetched, err := tdb.GetProduct(p.ID)
 	is.NoErr(err)
@@ -107,7 +109,9 @@ func TestGetProduct(t *testing.T) {
 	is.Equal(p.Category, fetched.Category)
 	is.Equal(p.Thumbnail, fetched.Thumbnail)
 
-	is.True(len(fetched.Options) == 2) // We provided 2 options, so why is it not there?
+	is.True(len(fetched.Options) == 2)
+	is.Equal(fetched.Options[0].Color, product.Options[0].Color)
+	is.Equal(fetched.Options[1].Color, product.Options[1].Color)
 }
 
 func TestGetProductsByCategory(t *testing.T) {
@@ -222,5 +226,5 @@ func TestGetProductsByCategoryPagination(t *testing.T) {
 	})
 	is.NoErr(err)
 	is.True(len(fetched) == 4)
-	is.True(last == "")
+	is.True(last == "") // No more keys
 }
