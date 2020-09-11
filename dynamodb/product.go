@@ -16,12 +16,12 @@ import (
 // Option represents an option for an Product.
 // For example, a product can have many different colors, sizes etc etc.
 type Option struct {
-	CreatedDate    time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc"`
-	Size           string     `json:"size" dynamodbav:"Size,omitempty"`     // TODO enum?
-	Socket         string     `json:"socket" dynamodbav:"Socket,omitempty"` // TODO enum?
-	Color          string     `json:"color" dynamodbav:"Color,omitempty"`   // TODO enum?
-	Stock          int        `json:"stock" dynamodbav:"Stock,omitempty"`
-	ShaftStiffness float64    `json:"shaftStiffness" dynamodbav:"ShaftStiffness,omitempty"`
+	CreatedDate    time.Time `json:"createdUtc" dynamodbav:"CreatedUtc"`
+	Size           string    `json:"size" dynamodbav:"Size,omitempty"`     // TODO enum?
+	Socket         string    `json:"socket" dynamodbav:"Socket,omitempty"` // TODO enum?
+	Color          string    `json:"color" dynamodbav:"Color,omitempty"`   // TODO enum?
+	Stock          int       `json:"stock" dynamodbav:"Stock,omitempty"`
+	ShaftStiffness float64   `json:"shaftStiffness" dynamodbav:"ShaftStiffness,omitempty"`
 }
 
 // Product represents the product that customers buys.
