@@ -62,6 +62,43 @@ func TestAddOptionToProduct(t *testing.T) {
 	is.Equal(updatedProduct.Options[0].Socket, option.Socket)
 }
 
+func TestAddToManyOptionsToProduct(t *testing.T) {
+	is := is.New(t)
+	product := Product{
+		Name:        "Golf Club",
+		Description: "This is a product",
+		Category:    "Club",
+		Price:       1000,
+		Weight:      1500,
+		Image:       "s3://images/image.png",
+		Thumbnail:   "s3://images/thumbnail.png",
+	}
+
+	tdb, err := NewTestDynamoDB()
+	is.NoErr(err)
+	//defer tdb.Close()
+
+	var fakeOpts []Option
+	for i := 1; i <= 50; i++ {
+		fakeOpts = append(fakeOpts, Option{
+			Color: "Red",
+		})
+	}
+	product.Options = fakeOpts
+
+	p, err := tdb.AddProduct(product)
+	is.NoErr(err)
+
+	_, err = tdb.AddOptionToProduct(p.ID, Option{
+		Color:          "red",
+		Stock:          1,
+		Size:           "Medium",
+		ShaftStiffness: 11.5,
+		Socket:         "Right",
+	})
+	is.True(err != nil)
+}
+
 func TestGetProduct(t *testing.T) {
 	is := is.New(t)
 	product := Product{
