@@ -1,54 +1,73 @@
 package dynamodb
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"math"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
 )
 
+// Option represents an option for an Product.
+// For example, a product can have many different colors, sizes etc etc.
 type Option struct {
-	ID             string  `json:"id" dynamodbav:"Id,omitempty"`
-	CreatedDate    string  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
-	Size           string  `json:"size" dynamodbav:"Size,omitempty"`     // TODO enum?
-	Socket         string  `json:"socket" dynamodbav:"Socket,omitempty"` // TODO enum?
-	Color          string  `json:"color" dynamodbav:"Color,omitempty"`   // TODO enum?
-	Stock          int     `json:"stock" dynamodbav:"Stock,omitempty"`
-	ShaftStiffness float64 `json:"shaftStiffness" dynamodbav:"ShaftStiffness,omitempty"`
+	ID             SortableID `json:"id" dynamodbav:"Id,omitempty"`
+	CreatedDate    time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	Size           string     `json:"size" dynamodbav:"Size,omitempty"`     // TODO enum?
+	Socket         string     `json:"socket" dynamodbav:"Socket,omitempty"` // TODO enum?
+	Color          string     `json:"color" dynamodbav:"Color,omitempty"`   // TODO enum?
+	Stock          int        `json:"stock" dynamodbav:"Stock,omitempty"`
+	ShaftStiffness float64    `json:"shaftStiffness" dynamodbav:"ShaftStiffness,omitempty"`
 }
 
+// Product represents the product that customers buys.
 type Product struct {
-	ID          string   `json:"id" dynamodbav:"Id,omitempty"`
-	CreatedDate string   `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
-	Category    string   `json:"category" dynamodbav:"Category,omitempty"`
-	Name        string   `json:"name" dynamodbav:"Name,omitempty"`
-	Description string   `json:"description" dynamodbav:"Description,omitempty"`
-	Image       string   `json:"image" dynamodbav:"Image,omitempty"`
-	Thumbnail   string   `json:"thumbNail" dynamodbav:"ThumbNail,omitempty"`
-	Price       int      `json:"price" dynamodbav:"Price,omitempty"`
-	Weight      int      `json:"weight" dynamodbav:"Weight,omitempty"`
-	Options     []Option `json:"options" dynamodbav:"Options,omitempty"`
+	ID          SortableID `json:"id" dynamodbav:"Id,omitempty"`
+	CreatedDate time.Time  `json:"createdUtc" dynamodbav:"CreatedUtc,omitempty"`
+	Category    string     `json:"category" dynamodbav:"Category,omitempty"`
+	Name        string     `json:"name" dynamodbav:"Name,omitempty"`
+	Description string     `json:"description" dynamodbav:"Description,omitempty"`
+	Image       string     `json:"image" dynamodbav:"Image,omitempty"`
+	Thumbnail   string     `json:"thumbNail" dynamodbav:"ThumbNail,omitempty"`
+	Price       int        `json:"price" dynamodbav:"Price,omitempty"`
+	Weight      int        `json:"weight" dynamodbav:"Weight,omitempty"`
+	Sale        int        `json:"sale" dynamodbav:"Sale,omitempty"`
+	Options     []Option   `json:"options" dynamodbav:"-"`
 }
 
+// Basket contains the Products an customer wants to buy in the future.
 type Basket struct {
-	ID string `json:"id"`
+	Products []Product `json:"products"`
 }
 
+// BasketItem contains the pointers to which customer
+// wants which product within the basket.
+type BasketItem struct {
+	CustomerID      SortableID `json:"customerId" dynamodbav:"CustomerId"`
+	ProductID       SortableID `json:"productId" dynamodbav:"ProductId"`
+	ProductOptionID SortableID `json:"productOptionId" dynamodbav:"ProductOptionId"`
+}
+
+// DynamoDB wraps AWS dynamodb.DynamoDB
+// This is to add domain logic.
 type DynamoDB struct {
 	db        *dynamodb.DynamoDB
 	tableName string
 }
 
+// New creates a DynamoDB wrapper.
 func New(endpoint, tableName string) (*DynamoDB, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
+
 	svc := dynamodb.New(sess, &aws.Config{
 		Endpoint: aws.String(endpoint),
 	})
@@ -62,18 +81,19 @@ func New(endpoint, tableName string) (*DynamoDB, error) {
 // AddProduct take a Product p and attempts to put that item into DynamoDB.
 func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 
-	p.CreatedDate = time.Now().Format(time.RFC3339)
-	p.ID = uuid.New().String()
+	p.CreatedDate = time.Now()
+	p.ID = NewSortableID()
 
 	pk := fmt.Sprintf("PRODUCT#%s", p.ID)
 	sort := "METADATA#"
 	gs1pk := fmt.Sprintf("PRODUCT#CATEGORY#%s", p.Category)
-	gs1sk := strconv.Itoa(p.Price)
+	gs1sk := zerosPricePadding(p.Price)
 
 	item, err := dynamodbattribute.MarshalMap(&p)
 	if err != nil {
 		return Product{}, err
 	}
+
 	item["Type"] = &dynamodb.AttributeValue{S: aws.String("product")}
 	item["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
 	item["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
@@ -89,9 +109,9 @@ func (db *DynamoDB) AddProduct(p Product) (Product, error) {
 }
 
 // AddOptionToProduct adds a single option to a product.
-func (db *DynamoDB) AddOptionToProduct(id string, option Option) (Option, error) {
-	option.ID = uuid.New().String()
-	option.CreatedDate = time.Now().Format(time.RFC3339)
+func (db *DynamoDB) AddOptionToProduct(id SortableID, option Option) (Option, error) {
+	option.ID = NewSortableID()
+	option.CreatedDate = time.Now()
 
 	pk := fmt.Sprintf("PRODUCT#%s", id)
 	sort := fmt.Sprintf("OPTION#%s", option.ID)
@@ -113,7 +133,7 @@ func (db *DynamoDB) AddOptionToProduct(id string, option Option) (Option, error)
 }
 
 // GetProduct fetches the product will all their options included.
-func (db *DynamoDB) GetProduct(id string) (Product, error) {
+func (db *DynamoDB) GetProduct(id SortableID) (Product, error) {
 	var result Product
 
 	res, err := db.db.Query(&dynamodb.QueryInput{
@@ -152,16 +172,43 @@ func (db *DynamoDB) GetProduct(id string) (Product, error) {
 	return result, err
 }
 
-func (db *DynamoDB) GetProductsByCategoryAndPrice(category string, from, to int) ([]Product, error) {
-	return db.getProductsByCategoryAndPrice(category, from, to)
+type GetProductsByCategoryInput struct {
+	Category        string // required
+	FromPrice       int
+	ToPrice         int
+	PaginationLimit int
+	PreviousKey     ProductCategoryPaginationKey
 }
 
-func (db *DynamoDB) GetProductsByCategory(category string) ([]Product, error) {
-	return db.getProductsByCategoryAndPrice(category, 0, math.MaxInt64)
+func (in *GetProductsByCategoryInput) validate() error {
+	// TODO use enums here .
+	if in.Category == "" {
+		return errors.New("Expected Category to have a value.")
+	}
+
+	if in.ToPrice < in.FromPrice {
+		return fmt.Errorf("PriceRange.To (%d) is smaller then PriceRange.From (%d).", in.ToPrice, in.FromPrice)
+	}
+
+	if in.ToPrice == 0 {
+		in.ToPrice = math.MaxInt64
+	}
+
+	if in.PaginationLimit == 0 {
+		in.PaginationLimit = 20
+	}
+
+	return nil
 }
 
-func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int) ([]Product, error) {
+// GetProductsByCategory fetches all products with a specific Category and price range.
+func (db *DynamoDB) GetProductsByCategory(input *GetProductsByCategoryInput) ([]Product, ProductCategoryPaginationKey, error) {
+	if err := input.validate(); err != nil {
+		return nil, "", err
+	}
+
 	var result []Product
+	var lastKey ProductCategoryPaginationKey
 
 	res, err := db.db.Query(&dynamodb.QueryInput{
 		TableName:              aws.String(db.tableName),
@@ -173,13 +220,73 @@ func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int)
 		},
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":gsi1pk": {
-				S: aws.String(fmt.Sprintf("PRODUCT#CATEGORY#%s", category)),
+				S: aws.String(fmt.Sprintf("PRODUCT#CATEGORY#%s", input.Category)),
 			},
 			":from": {
-				S: aws.String(strconv.Itoa(from)),
+				S: aws.String(zerosPricePadding(input.FromPrice)),
 			},
 			":to": {
-				S: aws.String(strconv.Itoa(to)),
+				S: aws.String(zerosPricePadding(input.ToPrice)),
+			},
+		},
+		Limit:             aws.Int64(int64(input.PaginationLimit)),
+		ExclusiveStartKey: decodePaginationKey(input.PreviousKey),
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	if len(res.Items) == 0 {
+		// TODO error not found here?
+		return nil, "", nil
+	}
+
+	err = dynamodbattribute.UnmarshalMap(res.LastEvaluatedKey, &lastKey)
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return result, lastKey, err
+}
+
+// AddBasketItem adds an BasketItem
+func (db *DynamoDB) AddBasketItem(item BasketItem) error {
+	pk := fmt.Sprintf("BASKET#%s", item.CustomerID)
+	sort := fmt.Sprintf("PRODUCT#%s", NewSortableID())
+
+	i, err := dynamodbattribute.MarshalMap(&item)
+	if err != nil {
+		return err
+	}
+	i["Type"] = &dynamodb.AttributeValue{S: aws.String("BasketItem")}
+	i["PK"] = &dynamodb.AttributeValue{S: aws.String(pk)}
+	i["SK"] = &dynamodb.AttributeValue{S: aws.String(sort)}
+
+	_, err = db.db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(db.tableName),
+		Item:      i,
+	})
+
+	return err
+}
+
+// SortableID makes the ID sortable.
+func (db *DynamoDB) GetBasketProducts(customerID SortableID) ([]Product, error) {
+	pk := fmt.Sprintf("BASKET#%s", customerID)
+
+	res, err := db.db.Query(&dynamodb.QueryInput{
+		TableName:              aws.String(db.tableName),
+		KeyConditionExpression: aws.String("#PK = :pk"),
+		ExpressionAttributeNames: map[string]*string{
+			"#PK": aws.String("PK"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":pk": {
+				S: aws.String(pk),
 			},
 		},
 	})
@@ -187,14 +294,125 @@ func (db *DynamoDB) getProductsByCategoryAndPrice(category string, from, to int)
 		return nil, err
 	}
 	if len(res.Items) == 0 {
-		// TODO error not found here?
 		return nil, nil
 	}
 
-	err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &result)
+	attrs := []map[string]*dynamodb.AttributeValue{}
+	for _, att := range res.Items {
+		attrs = append(attrs, map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String(fmt.Sprintf("PRODUCT#%s", *att["ProductId"].S)),
+			},
+			"SK": {
+				S: aws.String("METADATA#"),
+			},
+		})
+	}
+	batch, err := db.db.BatchGetItem(&dynamodb.BatchGetItemInput{
+		RequestItems: map[string]*dynamodb.KeysAndAttributes{
+			db.tableName: {
+				Keys: attrs,
+			},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return result, err
+	prods, ok := batch.Responses[db.tableName]
+	if !ok {
+		return nil, nil
+	}
+
+	var products []Product
+	err = dynamodbattribute.UnmarshalListOfMaps(prods, &products)
+	if err != nil {
+		return nil, err
+	}
+
+	return products, nil
+}
+
+type SortableID ksuid.KSUID
+
+// NewSortableID creates a new sortable id.
+func NewSortableID() SortableID { return SortableID(ksuid.New()) }
+
+// String satisfies the Stringer interface.
+func (id SortableID) String() string { return ksuid.KSUID(id).String() }
+
+// MarshalDynamoDBAttributeValue satisfy the dynamodbattribute.Marshaler interface.
+// By doing that I can tell DynamoDB how to handle my SortableID.
+func (id *SortableID) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
+	v := fmt.Sprintf("%s", id)
+	av.S = &v
+	return nil
+}
+
+// UnmarshalDynamoDBAttributeValue satisfy the dynamodbattribute.Unmarshaler interface.
+// By doing that I can tell DynamoDB how to handle my SortableID.
+func (id *SortableID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
+	if av.S == nil {
+		return nil
+	}
+
+	v, err := ksuid.Parse(*av.S)
+	if err != nil {
+		return err
+	}
+	*id = SortableID(v)
+
+	return nil
+}
+
+type ProductCategoryPaginationKey string
+
+func (k *ProductCategoryPaginationKey) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
+	if av.M == nil {
+		return nil
+	}
+	key := fmt.Sprintf("%s_%s_%s_%s", *av.M["PK"].S, *av.M["SK"].S, *av.M["GSI1PK"].S, *av.M["GSI1SK"].S)
+	key = base64.StdEncoding.EncodeToString([]byte(key))
+
+	*k = ProductCategoryPaginationKey(key)
+
+	return nil
+}
+
+func decodePaginationKey(pkey ProductCategoryPaginationKey) map[string]*dynamodb.AttributeValue {
+	if pkey == "" {
+		return nil
+	}
+	key, err := base64.StdEncoding.DecodeString(string(pkey))
+	if err != nil {
+		// TODO return error here instead?
+		return nil
+	}
+	s := strings.Split(string(key), "_")
+	if len(s) != 4 {
+		// TODO error
+		return nil
+	}
+
+	pk, sk, gsi, gsisk := s[0], s[1], s[2], s[3]
+
+	return map[string]*dynamodb.AttributeValue{
+		"PK": {
+			S: aws.String(pk),
+		},
+		"SK": {
+			S: aws.String(sk),
+		},
+		"GSI1PK": {
+			S: aws.String(gsi),
+		},
+		"GSI1SK": {
+			S: aws.String(gsisk),
+		},
+	}
+
+}
+
+func zerosPricePadding(i int) string {
+	return fmt.Sprintf("%015d", i)
 }
